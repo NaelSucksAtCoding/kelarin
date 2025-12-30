@@ -6,6 +6,7 @@ use App\Models\Task;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 use App\Models\Category;
 
 class TaskController extends Controller
@@ -68,6 +69,26 @@ class TaskController extends Controller
         // Ambil Daftar Kategori milik User (Buat Sidebar & Dropdown)
         $categories = Category::where('user_id', auth()->id())->withCount('tasks')->get();
 
+        // Ambil 7 hari terakhir
+        $start = Carbon::now()->subDays(6);
+        $end = Carbon::now();
+        $period = CarbonPeriod::create($start, $end);
+
+        $weeklyStats = collect($period)->map(function ($date) {
+            return [
+                'day' => $date->format('D'), // Mon, Tue, Wed...
+                // Hitung tugas yang dibuat hari itu
+                'added' => Task::where('user_id', auth()->id())
+                            ->whereDate('created_at', $date)
+                            ->count(),
+                // Hitung tugas yang statusnya DONE dan diupdate hari itu
+                'done' => Task::where('user_id', auth()->id())
+                            ->where('status', 'done')
+                            ->whereDate('updated_at', $date)
+                            ->count(),
+            ];
+        })->values(); // Reset keys biar jadi array bersih JSON
+
         return Inertia::render('Dashboard', [
             'tasks' => $tasks,
             'categories' => $categories,
@@ -75,6 +96,7 @@ class TaskController extends Controller
             'currentCategoryId' => $request->input('category_id'),
             'searchTerm' => $request->input('search'), // <--- Kirim balik search term ke frontend
             'flash' => session('flash') ?? [], // Pastikan flash dikirim kalau belum
+            'weeklyStats' => $weeklyStats,
         ]);
     }
 
