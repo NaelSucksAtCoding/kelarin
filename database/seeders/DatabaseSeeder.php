@@ -3,23 +3,23 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
+        // 1. Bikin User Admin Default
+        // Biar lu gampang login, password default-nya biasanya 'password'
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'name' => 'Admin Beres',
+            'email' => 'admin@beres.in',
+            'password' => bcrypt('password'), // Password-nya: password
+        ]);
+
+        // 2. Panggil TaskSeeder buat ngisi tugas ke user di atas
+        $this->call([
+            TaskSeeder::class,
         ]);
     }
 }
