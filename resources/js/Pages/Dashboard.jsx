@@ -113,7 +113,7 @@ export default function Dashboard({ auth, tasks, flash = {} }) {
                         <img 
                             src={logoKelarin} 
                             alt="Logo Kelarin" 
-                            className="w-20 h-20 object-contain" 
+                            className="w-20  h-20 object-contain" 
                         />
 
                         <h2 className="text-3xl font-bold"> 
