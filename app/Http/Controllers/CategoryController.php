@@ -22,17 +22,38 @@ class CategoryController extends Controller
         return back()->with('success', 'Project baru berhasil dibuat! 📂');
     }
 
-    // HAPUS KATEGORI
-    public function destroy(Category $category)
+    public function update(Request $request, Category $category)
     {
-        // Pastikan yang ngehapus adalah pemiliknya
+        // Pastikan punya dia
         if ($category->user_id !== auth()->id()) {
             abort(403);
         }
 
+        $request->validate([
+            'name' => 'required|string|max:50',
+        ]);
+
+        $category->update(['name' => $request->name]);
+
+        return back()->with('success', 'Nama project berhasil diubah! ✏️');
+    }
+
+    // HAPUS KATEGORI
+    public function destroy(Request $request, Category $category)
+    {
+        if ($category->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        // Cek apakah user minta hapus tugasnya juga?
+        if ($request->has('delete_tasks') && $request->delete_tasks == 'true') {
+            // Hapus semua tugas di dalam kategori ini (Soft Delete)
+            $category->tasks()->delete();
+        }
+
+        // Hapus kategorinya
         $category->delete();
 
-        // Redirect ke dashboard (bukan back) takutnya user lagi buka halaman kategori itu
-        return to_route('dashboard')->with('success', 'Project berhasil dihapus. Tugas masuk ke Inbox.');
+        return to_route('dashboard')->with('success', 'Project berhasil dihapus.');
     }
 }

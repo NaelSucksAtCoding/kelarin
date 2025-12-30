@@ -41,7 +41,7 @@ class TaskController extends Controller
         $tasks = $query->with('category')->orderBy('created_at', 'desc')->get(); // with('category') biar nama kategorinya kebawa
 
         // Ambil Daftar Kategori milik User (Buat Sidebar & Dropdown)
-        $categories = Category::where('user_id', auth()->id())->get();
+        $categories = Category::where('user_id', auth()->id())->withCount('tasks')->get();
 
         return Inertia::render('Dashboard', [
             'tasks' => $tasks,

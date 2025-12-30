@@ -14,59 +14,92 @@ export default function Authenticated({ user, header, children, categories = [],
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const { url } = usePage();
+    const [showUserMenu, setShowUserMenu] = useState(false);
+    
+    // STATE KHUSUS EDIT
+    const [editingCategory, setEditingCategory] = useState(null); // Kategori yang lagi diedit
 
     // STATE & FORM BUAT KATEGORI
     const [isCatModalOpen, setIsCatModalOpen] = useState(false);
-    const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
+    const { data, setData, post, patch, processing, reset, errors, clearErrors } = useForm({
         name: '',
     });
 
-    // Handle Buka Modal
-    const openCategoryModal = () => {
+    // Handle Buka Modal (CREATE)
+    const openCreateModal = () => {
         clearErrors();
-        reset();
+        reset(); // Kosongin form
+        setEditingCategory(null); // Mode Create: set null
         setIsCatModalOpen(true);
     };
 
-    // Handle Simpan Kategori
-    const submitCategory = (e) => {
-        e.preventDefault();
-        post(route('categories.store'), {
-            onSuccess: () => setIsCatModalOpen(false),
-        });
+    // Handle Buka Modal (EDIT) -> PENTING
+    const openEditModal = (cat) => {
+        clearErrors();
+        setData('name', cat.name); // Isi form dengan nama lama
+        setEditingCategory(cat); // Mode Edit: isi data kategori
+        setIsCatModalOpen(true);
     };
 
-    // Handle Hapus Kategori
-// Handle Hapus Kategori (Versi Router Inertia - Lebih Stabil)
-    const deleteCategory = (e, id, name) => {
+    // Handle Simpan Kategori (Bisa Create atau Update)
+    const submitCategory = (e) => {
+        e.preventDefault();
+        
+        if (editingCategory) {
+            // Pakai method 'patch' bawaan useForm. Anti ribet.
+            patch(route('categories.update', editingCategory.id), {
+                onSuccess: () => setIsCatModalOpen(false),
+            });
+        } else {
+            // LOGIC CREATE (POST)
+            post(route('categories.store'), {
+                onSuccess: () => setIsCatModalOpen(false),
+            });
+        }
+    };
+
+    // Handle Hapus Kategori (Versi Router Inertia - Lebih Stabil)
+    const deleteCategory = (e, id, name, taskCount) => {
         e.preventDefault();
         
         Swal.fire({
             title: `Hapus Project "${name}"?`,
-            text: "Tugas di dalamnya TIDAK akan terhapus (pindah ke Inbox).",
+            // Kasih info ada berapa tugas di dalamnya
+            text: taskCount > 0 
+                ? `Ada ${taskCount} tugas di dalam project ini. Mau diapain?` 
+                : "Project ini kosong, aman buat dihapus.",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, Hapus Project!',
-            cancelButtonText: 'Batal'
+            showDenyButton: taskCount > 0, // Tombol opsi ke-2 cuma muncul kalau ada tugasnya
+            
+            // Konfigurasi 3 Tombol
+            confirmButtonColor: '#d33',     // Merah (Hapus Semua)
+            denyButtonColor: '#3085d6',     // Biru (Pindah Inbox)
+            cancelButtonColor: '#6b7280',   // Abu (Batal)
+            
+            confirmButtonText: taskCount > 0 ? '🔥 Musnahkan Semua' : 'Ya, Hapus',
+            denyButtonText: '📂 Pindahin Tugas ke Inbox',
+            cancelButtonText: 'Batal',
+            reverseButtons: true // Biar tombol bahaya di kanan/kiri sesuai selera (opsional)
         }).then((result) => {
             if (result.isConfirmed) {
-                // Pake router.delete bawaan Inertia. Lebih clean & aman!
+                // PILIHAN 1: HAPUS PROJECT + TUGAS
                 router.delete(route('categories.destroy', id), {
-                    onSuccess: () => {
-                        // Gak perlu alert lagi disini, karena udah di-handle flash message Dashboard
-                    },
-                    onError: () => {
-                        Swal.fire('Gagal!', 'Gagal menghapus project.', 'error');
-                    }
+                    data: { delete_tasks: true }, // Kirim sinyal ke controller
+                    onError: () => Swal.fire('Gagal!', 'Terjadi kesalahan.', 'error')
+                });
+            } else if (result.isDenied) {
+                // PILIHAN 2: HAPUS PROJECT AJA (Tugas ke Inbox)
+                router.delete(route('categories.destroy', id), {
+                    data: { delete_tasks: false }, // Default behavior
+                    onError: () => Swal.fire('Gagal!', 'Terjadi kesalahan.', 'error')
                 });
             }
         });
     };
 
     // Komponen Link Sidebar
-    const SidebarLink = ({ href, active, icon, label, badge = null, onDelete = null }) => (
+    const SidebarLink = ({ href, active, icon, label, badge = null, onDelete = null, onEdit = null }) => (
         <Link
             href={href}
             title={!isSidebarOpen ? label : ''}
@@ -80,22 +113,49 @@ export default function Authenticated({ user, header, children, categories = [],
         >
             <div className={`flex items-center ${isSidebarOpen ? 'gap-3' : ''}`}>
                 <span className={`${isSidebarOpen ? 'text-lg' : 'text-xl'}`}>{icon}</span>
-                <span className={`transition-all duration-300 truncate max-w-[120px] ${isSidebarOpen ? 'opacity-100 block' : 'opacity-0 hidden w-0'}`}>
+                <span className={`transition-all duration-300 truncate max-w-[100px] ${isSidebarOpen ? 'opacity-100 block' : 'opacity-0 hidden w-0'}`}>
                     {label}
                 </span>
             </div>
             
-            {/* Tombol Delete (Muncul pas Hover & Sidebar Buka) */}
-            {onDelete && isSidebarOpen && (
-                <button 
-                    onClick={onDelete}
-                    className="absolute right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                    title="Hapus Project"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                    </svg>
-                </button>
+            {/* Bagian Kanan: Badge Angka & Action Buttons */}
+            {isSidebarOpen && (
+                <div className="flex items-center gap-1">
+                    {/* Badge Angka (Kalau ada tugasnya) */}
+                    {badge > 0 && (
+                        <span className={`text-[10px] py-0.5 px-2 rounded-full font-bold transition-opacity ${active ? 'bg-purple-200 text-purple-700' : 'bg-gray-100 text-gray-500'} group-hover:hidden`}>
+                            {badge}
+                        </span>
+                    )}
+
+                    {/* Tombol Edit & Delete (Muncul pas Hover) */}
+                    {(onEdit || onDelete) && (
+                        <div className="hidden group-hover:flex items-center bg-white/50 backdrop-blur-sm rounded-md">
+                            {onEdit && (
+                                <button 
+                                    onClick={(e) => { e.preventDefault(); onEdit(); }}
+                                    className="p-1 text-gray-400 hover:text-blue-500 transition"
+                                    title="Ganti Nama"
+                                >
+                                    ✏️
+                                </button>
+                            )}
+                            {onDelete && (
+                                <button 
+                                    onClick={(e) => { 
+                                        e.preventDefault(); // Cegah link kebuka
+                                        e.stopPropagation(); // Cegah event nembus ke elemen lain
+                                        onDelete(e); // <--- PENTING: Lempar 'e' ke fungsi parent
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-red-500 transition"
+                                    title="Hapus Project"
+                                >
+                                    ❌
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
             )}
         </Link>
     );
@@ -149,7 +209,7 @@ export default function Authenticated({ user, header, children, categories = [],
 
                     <div className="my-4 border-t border-gray-100"></div>
 
-                    {/* 3. Project / Kategori (REAL DARI DATABASE) */}
+                    {/* 3. Project / Kategori */}
                     <div>
                         <div className={`flex items-center mb-2 transition-all ${isSidebarOpen ? 'justify-between px-4' : 'justify-center'}`}>
                             <div className={`text-xs font-bold text-gray-400 uppercase tracking-wider ${!isSidebarOpen && 'hidden'}`}>
@@ -157,7 +217,7 @@ export default function Authenticated({ user, header, children, categories = [],
                             </div>
                             {/* Tombol Tambah Project */}
                             <button 
-                                onClick={openCategoryModal}
+                                onClick={openCreateModal} // <--- Panggil fungsi Create Modal
                                 className="text-gray-400 hover:text-purple-600 text-xs font-bold p-1 rounded hover:bg-purple-50 transition"
                             >
                                 {isSidebarOpen ? '+ Baru' : <span className="text-lg">+</span>}
@@ -173,8 +233,9 @@ export default function Authenticated({ user, header, children, categories = [],
                                     active={currentCategoryId == cat.id} 
                                     icon="📁" 
                                     label={cat.name}
-                                    // Pass fungsi delete
-                                    onDelete={(e) => deleteCategory(e, cat.id, cat.name)}
+                                    badge={cat.tasks_count} // Kirim Jumlah Tugas
+                                    onEdit={() => openEditModal(cat)} // Kirim Fungsi Edit
+                                    onDelete={(e) => deleteCategory(e, cat.id, cat.name, cat.tasks_count)}
                                 />
                             ))
                         ) : (
@@ -184,33 +245,74 @@ export default function Authenticated({ user, header, children, categories = [],
                 </div>
 
                 {/* 4. User Profile */}
-                <div className="p-3 border-t border-gray-100">
-                    <Dropdown>
-                        <Dropdown.Trigger>
-                            <button className={`flex items-center w-full p-2 hover:bg-gray-50 rounded-lg transition ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}>
-                                <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-xs">
-                                    {user.name.charAt(0)}
+                <div className="p-3 border-t border-gray-100 relative">
+                    
+                    {/* MENU POP-UP (MUNCUL KE ATAS) */}
+                    {showUserMenu && (
+                        <>
+                            <div 
+                                className="fixed inset-0 z-40" 
+                                onClick={() => setShowUserMenu(false)}
+                            ></div>
+
+                            <div 
+                                className={`
+                                    absolute bottom-full mb-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50
+                                    transition-all duration-200 ease-out origin-bottom
+                                    ${isSidebarOpen ? 'left-3 right-3' : 'left-full ml-2 w-48 bottom-0'} 
+                                `}
+                            >
+                                <div className="py-1">
+                                    <Link 
+                                        href={route('profile.edit')} 
+                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600"
+                                        onClick={() => setShowUserMenu(false)}
+                                    >
+                                        Profile
+                                    </Link>
+                                    <Link 
+                                        href={route('logout')} 
+                                        method="post" 
+                                        as="button"
+                                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                        onClick={() => setShowUserMenu(false)}
+                                    >
+                                        Log Out
+                                    </Link>
                                 </div>
-                                <div className={`flex-1 min-w-0 text-left transition-all duration-300 ${isSidebarOpen ? 'block opacity-100' : 'hidden opacity-0'}`}>
-                                    <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-                                    <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                                </div>
-                                {isSidebarOpen && <span className="text-gray-400">▼</span>}
-                            </button>
-                        </Dropdown.Trigger>
-                        <Dropdown.Content align={isSidebarOpen ? 'right' : 'left'} width="48">
-                            <Dropdown.Link href={route('profile.edit')}>Profile</Dropdown.Link>
-                            <Dropdown.Link href={route('logout')} method="post" as="button">Log Out</Dropdown.Link>
-                        </Dropdown.Content>
-                    </Dropdown>
+                            </div>
+                        </>
+                    )}
+
+                    {/* TOMBOL TRIGGER */}
+                    <button 
+                        onClick={() => setShowUserMenu(!showUserMenu)}
+                        className={`flex items-center w-full p-2 hover:bg-gray-50 rounded-lg transition ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
+                    >
+                        <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-xs">
+                            {user.name.charAt(0)}
+                        </div>
+                        
+                        <div className={`flex-1 min-w-0 text-left transition-all duration-300 ${isSidebarOpen ? 'block opacity-100' : 'hidden opacity-0'}`}>
+                            <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                            <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        </div>
+                        
+                        {isSidebarOpen && (
+                            <span className={`text-gray-400 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`}>
+                                ▲
+                            </span>
+                        )}
+                    </button>
                 </div>
             </aside>
 
-            {/* ================= MODAL TAMBAH KATEGORI (BARU) ================= */}
+            {/* ================= MODAL TAMBAH/EDIT KATEGORI ================= */}
             <Modal show={isCatModalOpen} onClose={() => setIsCatModalOpen(false)}>
                 <div className="p-6">
+                    {/* --- JUDUL DINAMIS --- */}
                     <h2 className="text-lg font-bold mb-4 text-gray-800">
-                        Buat Project Baru 📁
+                        {editingCategory ? 'Ganti Nama Project ✏️' : 'Buat Project Baru 📁'}
                     </h2>
 
                     <form onSubmit={submitCategory} className="space-y-4">
@@ -223,13 +325,14 @@ export default function Authenticated({ user, header, children, categories = [],
                                 placeholder="Contoh: Skripsi, Liburan, Bisnis..."
                                 autoFocus
                             />
-                            {/* Menampilkan error manual jika ada (dari props layout kalau mau detail, tapi default alert sukses cukup) */}
                         </div>
 
                         <div className="flex justify-end gap-3 mt-6">
                             <SecondaryButton onClick={() => setIsCatModalOpen(false)}>Batal</SecondaryButton>
+                            
+                            {/* --- TOMBOL DINAMIS --- */}
                             <PrimaryButton disabled={processing}>
-                                {processing ? 'Menyimpan...' : 'Buat Project'}
+                                {processing ? 'Menyimpan...' : (editingCategory ? 'Simpan Perubahan' : 'Buat Project')}
                             </PrimaryButton>
                         </div>
                     </form>
@@ -262,6 +365,7 @@ export default function Authenticated({ user, header, children, categories = [],
                             </div>
                         </div>
                     </div>
+                    {/* ... Mobile Menu Bawahnya tetep sama ... */}
                     <div className={(showingNavigationDropdown ? 'block' : 'hidden') + ' md:hidden bg-white border-b'}>
                         <div className="pt-2 pb-3 space-y-1">
                             <ResponsiveNavLink href={route('dashboard')} active={route().current('dashboard')}>Inbox</ResponsiveNavLink>
