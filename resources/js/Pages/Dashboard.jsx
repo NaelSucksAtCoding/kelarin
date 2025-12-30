@@ -18,7 +18,7 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
     const [filterStatus, setFilterStatus] = useState('all');
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
-        title: '', description: '', status: 'pending', due_date: '', category_id: '',
+        title: '', description: '', status: 'pending', priority: 'medium', due_date: '', category_id: '',
     });
 
     const pageTitles = {
@@ -31,7 +31,7 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
         if (activeCat) currentTitle = `Project: ${activeCat.name} 📂`;
     }
 
-    // --- UPDATE DI SINI: FLASH MESSAGE DARK MODE ---
+    // --- FLASH MESSAGE DARK MODE ---
     useEffect(() => {
         if (flash?.success) {
             const isDark = document.documentElement.classList.contains('dark');
@@ -43,7 +43,6 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                 confirmButtonColor: '#9333ea', 
                 timer: 3000, 
                 timerProgressBar: true,
-                // WARNA DARK MODE
                 background: isDark ? '#1f2937' : '#fff',
                 color: isDark ? '#fff' : '#1f2937',
             });
@@ -70,7 +69,7 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
         if (task) {
             setIsEditing(true); setEditingId(task.id);
             setData({
-                title: task.title, description: task.description || '', status: task.status,
+                title: task.title, description: task.description || '', status: task.status, priority: task.priority || 'medium',
                 due_date: task.due_date ? task.due_date.split('T')[0] : '', category_id: task.category_id || '',
             });
         } else {
@@ -85,7 +84,7 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
         isEditing ? put(route('tasks.update', editingId), { onSuccess: close }) : post(route('tasks.store'), { onSuccess: close });
     };
 
-    // --- UPDATE DI SINI: DELETE DARK MODE ---
+    // --- DELETE DARK MODE ---
     const handleDelete = (id) => {
         const isArchive = currentFilter === 'archive';
         const isDark = document.documentElement.classList.contains('dark');
@@ -97,7 +96,6 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
             showCancelButton: true, 
             confirmButtonColor: '#d33', 
             confirmButtonText: isArchive ? 'Ya, Musnahkan!' : 'Ya, Buang!',
-            // WARNA DARK MODE
             background: isDark ? '#1f2937' : '#fff',
             color: isDark ? '#fff' : '#1f2937',
         }).then((result) => {
@@ -105,7 +103,7 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
         });
     };
 
-    // --- UPDATE DI SINI: RESTORE DARK MODE ---
+    // --- RESTORE DARK MODE ---
     const handleRestore = (id) => {
         const isDark = document.documentElement.classList.contains('dark');
         
@@ -116,7 +114,6 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
             showCancelButton: true, 
             confirmButtonColor: '#10b981', 
             confirmButtonText: 'Ya, Balikin!',
-            // WARNA DARK MODE
             background: isDark ? '#1f2937' : '#fff',
             color: isDark ? '#fff' : '#1f2937',
         }).then((result) => {
@@ -128,6 +125,12 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
         pending: { label: 'Pending', badge: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700', card: 'bg-orange-50 dark:bg-gray-800 dark:border-gray-700' },
         progress: { label: 'Progress', badge: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700', card: 'bg-blue-50 dark:bg-gray-800 dark:border-gray-700' },
         done: { label: 'Done', badge: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700', card: 'bg-emerald-50 dark:bg-gray-800 dark:border-gray-700' },
+    };
+
+    const PRIORITY = {
+        high: { label: 'High', badge: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700', icon: '🔥' },
+        medium: { label: 'Medium', badge: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700', icon: '⚡' },
+        low: { label: 'Low', badge: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700', icon: '☕' },
     };
 
     return (
@@ -219,9 +222,18 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                                     >
                                         <div className="flex justify-between items-start mb-3">
                                             <div className="flex flex-wrap items-center gap-2 pr-2">
+                                                {/* 1. Status Badge */}
                                                 <span className={`text-[10px] px-2 py-1 rounded-full border font-bold uppercase tracking-wide ${STATUS[task.status].badge}`}>
                                                     {STATUS[task.status].label}
                                                 </span>
+
+                                                {/* 2. PRIORITY BADGE (NEW) */}
+                                                <span className={`text-[10px] px-2 py-1 rounded-full border font-bold uppercase tracking-wide flex items-center gap-1 ${PRIORITY[task.priority || 'medium'].badge}`}>
+                                                    <span>{PRIORITY[task.priority || 'medium'].icon}</span>
+                                                    {PRIORITY[task.priority || 'medium'].label}
+                                                </span>
+
+                                                {/* 3. Category Label */}
                                                 {task.category && (
                                                     <span className="text-[10px] px-2 py-1 rounded-full border bg-white/60 dark:bg-gray-700/60 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 font-medium flex items-center gap-1 truncate max-w-[120px]">
                                                         📂 {task.category.name}
@@ -281,7 +293,10 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                             <TextInput className="w-full mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value={data.title} onChange={e => setData('title', e.target.value)} placeholder="Contoh: Belajar Laravel" />
                             <InputError message={errors.title} />
                         </div>
+
+                        {/* GRID STATUS & PRIORITY */}
                         <div className="grid grid-cols-2 gap-4">
+                            {/* Kolom Kiri: Status */}
                             <div>
                                 <InputLabel value="Status" className="dark:text-gray-300" />
                                 <select className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white mt-1 focus:ring-purple-500 focus:border-purple-500" value={data.status} onChange={e => setData('status', e.target.value)}>
@@ -290,16 +305,33 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                                     <option value="done">✅ Done</option>
                                 </select>
                             </div>
+
+                            {/* Kolom Kanan: PRIORITY (NEW) */}
                             <div>
-                                <InputLabel value="Kategori (Project)" className="dark:text-gray-300" />
-                                <select className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white mt-1" value={data.category_id} onChange={e => setData('category_id', e.target.value)}>
-                                    <option value="">📂 Masuk Inbox (Tanpa Kategori)</option>
-                                    {categories.map(cat => (
-                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                    ))}
+                                <InputLabel value="Prioritas" className="dark:text-gray-300" />
+                                <select 
+                                    className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white mt-1 focus:ring-purple-500 focus:border-purple-500" 
+                                    value={data.priority} 
+                                    onChange={e => setData('priority', e.target.value)}
+                                >
+                                    <option value="high">🔥 High (Penting!)</option>
+                                    <option value="medium">⚡ Medium (Standar)</option>
+                                    <option value="low">☕ Low (Santai)</option>
                                 </select>
                             </div>
                         </div>
+
+                        {/* CATEGORY (Full Width di bawah Status/Priority) */}
+                        <div>
+                            <InputLabel value="Kategori (Project)" className="dark:text-gray-300" />
+                            <select className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white mt-1" value={data.category_id} onChange={e => setData('category_id', e.target.value)}>
+                                <option value="">📂 Masuk Inbox (Tanpa Kategori)</option>
+                                {categories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div>
                             <InputLabel value="Tenggat Waktu (Opsional)" className="dark:text-gray-300" />
                             <TextInput type="date" className="w-full mt-1 cursor-pointer dark:bg-gray-700 dark:border-gray-600 dark:text-white" value={data.due_date} onChange={e => setData('due_date', e.target.value)} />

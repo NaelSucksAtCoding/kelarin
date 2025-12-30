@@ -64,6 +64,7 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'status' => 'required|in:pending,progress,done',
             'due_date' => 'nullable|date',
+            'priority' => 'required|in:high,medium,low',
             // Kita izinkan category_id masuk, pastikan ID-nya ada di tabel categories
             'category_id' => 'nullable|exists:categories,id', 
         ]);
@@ -84,6 +85,7 @@ class TaskController extends Controller
             'description' => 'nullable|string',
             'status' => 'required|in:pending,progress,done',
             'due_date' => 'nullable|date',
+            'priority' => 'required|in:high,medium,low',
             'category_id' => 'nullable|exists:categories,id', // Tambahin ini
         ]);
 
