@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Task extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     // Kolom mana aja yang boleh diisi manual
     protected $fillable = [
@@ -15,11 +16,17 @@ class Task extends Model
         'title',
         'description',
         'status',
+        'category_id',
     ];
 
-    // Relasi balik: Sebuah Task milik satu User
     public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
+        {
+            return $this->belongsTo(User::class);
+        }
+
+        // Tugas milik satu Kategori (Opsional)
+        public function category()
+        {
+            return $this->belongsTo(Category::class);
+        }
 }
