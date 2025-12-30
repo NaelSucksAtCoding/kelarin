@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\CategoryController; 
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -32,6 +33,10 @@ Route::put('/tasks/{task}', [TaskController::class, 'update'])
 Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])
     ->middleware(['auth', 'verified'])
     ->name('tasks.destroy');
+
+Route::patch('/tasks/{id}/restore', [TaskController::class, 'restore'])->name('tasks.restore');
+
+Route::resource('categories', CategoryController::class)->only(['store', 'destroy']);
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

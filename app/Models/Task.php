@@ -17,6 +17,11 @@ class Task extends Model
         'description',
         'status',
         'category_id',
+        'due_date',
+    ];
+
+    protected $casts = [
+    'due_date' => 'datetime',
     ];
 
     public function user()

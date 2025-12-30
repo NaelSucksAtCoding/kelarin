@@ -5,70 +5,115 @@ namespace App\Http\Controllers;
 use App\Models\Task;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Carbon\Carbon;
+use App\Models\Category;
 
 class TaskController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // 1. Ambil data tugas punya user yang lagi login
-        $tasks = Task::where('user_id', auth()->id())
-                     ->orderBy('created_at', 'desc') // Urutkan dari yang terbaru
-                     ->get();
+        $query = Task::where('user_id', auth()->id());
 
-        // 2. Kirim data ke tampilan 'Dashboard' via Inertia
-        // 'tasks' ini nanti bakal jadi PROPS di React
+        // --- LOGIKA FILTER UPDATE ---
+        if ($request->has('category_id')) {
+            // Filter berdasarkan Kategori Spesifik
+            $query->where('category_id', $request->input('category_id'));
+        } 
+        else {
+            // Filter Sidebar Bawaan (Hanya jalan kalau BUKAN lagi milih kategori)
+            switch ($request->input('filter')) {
+                case 'today':
+                    $query->whereDate('due_date', Carbon::today());
+                    break;
+                case 'upcoming':
+                    $query->whereDate('due_date', '>', Carbon::today());
+                    break;
+                case 'archive':
+                    $query->onlyTrashed();
+                    break;
+                default:
+                    // Inbox (Semua yang belum dihapus) - Default behavior
+                    break;
+            }
+        }
+
+        // Ambil Tugas
+        $tasks = $query->with('category')->orderBy('created_at', 'desc')->get(); // with('category') biar nama kategorinya kebawa
+
+        // Ambil Daftar Kategori milik User (Buat Sidebar & Dropdown)
+        $categories = Category::where('user_id', auth()->id())->get();
+
         return Inertia::render('Dashboard', [
-            'tasks' => $tasks
+            'tasks' => $tasks,
+            'categories' => $categories, // <--- KIRIM INI KE FRONTEND
+            'currentFilter' => $request->input('filter', 'inbox'),
+            'currentCategoryId' => $request->input('category_id'), // Kirim ID kategori aktif (biar sidebar nyala)
         ]);
     }
 
     public function store(Request $request)
     {
-        // 1. Validasi input (Biar gak asal-asalan)
+        // --- PERBAIKAN DI SINI ---
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'status' => 'required|in:pending,progress,done',
+            'due_date' => 'nullable|date',
+            // Kita izinkan category_id masuk, pastikan ID-nya ada di tabel categories
+            'category_id' => 'nullable|exists:categories,id', 
         ]);
 
-        // 2. Simpan ke Database (Pake relasi user biar otomatis ada user_id nya)
         $request->user()->tasks()->create($validated);
 
-        // 3. Redirect balik (Inertia bakal otomatis refresh halaman tanpa reload)
         return to_route('dashboard')->with('success', 'Tugas baru berhasil dibuat! 🚀');
     }
     // Method buat UPDATE data
     public function update(Request $request, Task $task)
     {
-        // 1. Cek keamanan: Pastikan yang ngedit adalah pemilik tugas
         if ($task->user_id !== auth()->id()) {
             abort(403);
         }
 
-        // 2. Validasi input baru
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'status' => 'required|in:pending,progress,done',
+            'due_date' => 'nullable|date',
+            'category_id' => 'nullable|exists:categories,id', // Tambahin ini
         ]);
 
-        // 3. Update database
         $task->update($validated);
 
         return to_route('dashboard')->with('success', 'Tugas berhasil diupdate! ✨');
     }
 
     // Method buat DELETE data
-    public function destroy(Task $task)
+    public function destroy($id)
     {
-        // 1. Cek keamanan
-        if ($task->user_id !== auth()->id()) {
-            abort(403);
+        // Cari tugas (termasuk yang udah dihapus/soft deleted)
+        $task = Task::withTrashed()->where('id', $id)->where('user_id', auth()->id())->firstOrFail();
+
+        if ($task->trashed()) {
+            // Kalau udah di tong sampah, hapus permanen (Force Delete)
+            $task->forceDelete();
+            $message = 'Tugas dihapus selamanya (Permanen) 🔥';
+        } else {
+            // Kalau masih aktif, masukin tong sampah (Soft Delete)
+            $task->delete();
+            $message = 'Tugas dipindahkan ke Arsip 🗑️';
         }
 
-        // 2. Hapus dari database
-        $task->delete();
+        return back()->with('success', $message);
+    }
 
-        return to_route('dashboard')->with('success', 'Tugas berhasil dihapus! 🗑️');
+    public function restore($id)
+    {
+        // Cari tugas di tong sampah
+        $task = Task::onlyTrashed()->where('id', $id)->where('user_id', auth()->id())->firstOrFail();
+        
+        // Balikin nyawanya
+        $task->restore();
+
+        return back()->with('success', 'Tugas berhasil dikembalikan! ♻️');
     }
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'; // Tambah useEffect
+import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
@@ -7,23 +7,45 @@ import TextInput from '@/Components/TextInput';
 import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
-import Swal from 'sweetalert2'; // Import SweetAlert2
-import logoKelarin from '../../images/kelarinlogo.svg';
+import Swal from 'sweetalert2';
 
-// Tambah props 'flash' di sini buat nangkep pesan dari controller
-export default function Dashboard({ auth, tasks, flash = {} }) {
+// ⚠️ Pastikan baris ini sesuai sama lokasi logo lu, kadang beda folder/nama file
+import logoKelarin from '../../images/kelarinlogo.svg'; 
+
+// Props: categories dikasih default [] biar gak error layar putih
+export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'inbox', categories = [], currentCategoryId = null }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
+    
+    // Filter Lokal (Status)
     const [filterStatus, setFilterStatus] = useState('all');
 
+    // useForm dengan field lengkap
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
         title: '',
         description: '',
         status: 'pending',
+        due_date: '', 
+        category_id: '', // <--- Field Kategori
     });
 
-    // --- 1. POP UP PESAN SUKSES (useEffect) ---
+    // Judul Halaman Dinamis
+    const pageTitles = {
+        'today': 'Tugas Hari Ini ☀️',
+        'upcoming': 'Mendatang 🗓️',
+        'archive': 'Arsip / Sampah 📦',
+        'inbox': 'Inbox (Semua Tugas) 📥'
+    };
+    
+    // Logic Judul: Kalau lagi filter kategori, ambil nama kategorinya dari list
+    let currentTitle = pageTitles[currentFilter] || 'Daftar Tugas';
+    if (currentCategoryId) {
+        const activeCat = categories.find(c => c.id == currentCategoryId);
+        if (activeCat) currentTitle = `Project: ${activeCat.name} 📂`;
+    }
+
+    // Pop Up Sukses
     useEffect(() => {
         if (flash?.success) {
             Swal.fire({
@@ -31,19 +53,20 @@ export default function Dashboard({ auth, tasks, flash = {} }) {
                 text: flash.success,
                 icon: 'success',
                 confirmButtonText: 'Mantap',
-                confirmButtonColor: '#9333ea', // Warna Purple-600
-                timer: 3000, // Otomatis nutup dalam 3 detik
+                confirmButtonColor: '#9333ea',
+                timer: 3000,
                 timerProgressBar: true,
             });
         }
-    }, [flash]); // Jalanin setiap ada pesan sukses baru
+    }, [flash]);
 
-    // Logika Filter
+    // Filter Lokal
     const filteredTasks = tasks.filter(task => {
         if (filterStatus === 'all') return true;
         return task.status === filterStatus;
     });
 
+    // Buka Modal (Load Data)
     const openModal = (task = null) => {
         clearErrors();
         if (task) {
@@ -53,6 +76,8 @@ export default function Dashboard({ auth, tasks, flash = {} }) {
                 title: task.title,
                 description: task.description || '',
                 status: task.status,
+                due_date: task.due_date ? task.due_date.split('T')[0] : '', 
+                category_id: task.category_id || '', // <--- Load Kategori
             });
         } else {
             setIsEditing(false);
@@ -74,20 +99,42 @@ export default function Dashboard({ auth, tasks, flash = {} }) {
         }
     };
 
-    // --- 2. POP UP KONFIRMASI DELETE (Ganti confirm biasa) ---
     const handleDelete = (id) => {
+        // Cek lagi di Arsip atau bukan buat bedain pesan
+        const isArchive = currentFilter === 'archive';
+        
         Swal.fire({
-            title: 'Yakin mau hapus?',
-            text: "Data yang dihapus gak bisa balik lagi loh!",
-            icon: 'warning',
+            title: isArchive ? 'Hapus Permanen?' : 'Buang ke Sampah?',
+            text: isArchive 
+                ? "Data bakal hilang SELAMANYA gak bisa balik!" 
+                : "Tenang, masih bisa dibalikin dari menu Arsip.",
+            icon: isArchive ? 'error' : 'warning', // Merah kalau permanen, Kuning kalau sampah
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, Hapus!',
+            confirmButtonText: isArchive ? 'Ya, Musnahkan!' : 'Ya, Buang!',
             cancelButtonText: 'Batal'
         }).then((result) => {
             if (result.isConfirmed) {
                 router.delete(route('tasks.destroy', id));
+            }
+        });
+    };
+
+    const handleRestore = (id) => {
+        Swal.fire({
+            title: 'Balikin Tugas?',
+            text: "Tugas ini bakal aktif lagi dan masuk ke foldernya.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981', // Hijau Emerald
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Ya, Balikin!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Pake router.patch sesuai route di web.php
+                router.patch(route('tasks.restore', id));
             }
         });
     };
@@ -108,84 +155,155 @@ export default function Dashboard({ auth, tasks, flash = {} }) {
     return (
         <AuthenticatedLayout
             user={auth.user}
-                header={
-                    <div className="flex items-center gap-4"> 
-                        <img 
-                            src={logoKelarin} 
-                            alt="Logo Kelarin" 
-                            className="w-20  h-20 object-contain" 
-                        />
-
-                        <h2 className="text-3xl font-bold"> 
-                            Kelarin<span className="text-purple-600">.</span>
-                        </h2>
-                    </div>
-                }
+            categories={categories} // <--- Kirim ke Sidebar
+            currentCategoryId={currentCategoryId}
+            header={
+                <div className="flex items-center gap-4">
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        {currentTitle}
+                    </h2>
+                </div>
+            }
         >
             <Head title="Dashboard" />
 
-            <div className="py-12 bg-gray-50 min-h-screen">
-                <div className="max-w-7xl mx-auto px-6 space-y-10">
+            <div className="py-8 bg-gray-50 min-h-screen">
+                <div className="max-w-7xl mx-auto px-6 space-y-8">
 
                     {/* STAT CARDS */}
-                    <div className="flex flex-wrap gap-8 justify-center">
-                        <button onClick={() => setFilterStatus('all')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center aspect-[3/4] w-32 cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-md ${filterStatus === 'all' ? 'bg-white ring-2 ring-purple-500 ring-offset-2 border-purple-500' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total</p>
-                            <p className="text-3xl font-black text-gray-700">{stats.total}</p>
+                    <div className="flex flex-wrap gap-4 justify-center">
+                        <button onClick={() => setFilterStatus('all')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'all' ? 'bg-white ring-2 ring-purple-500 border-purple-500' : 'bg-white border-gray-200'}`}>
+                            <p className="text-[10px] font-bold uppercase text-gray-400">Total</p>
+                            <p className="text-2xl font-black text-gray-700">{stats.total}</p>
                         </button>
-                        <button onClick={() => setFilterStatus('pending')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center aspect-[3/4] w-32 cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-md ${filterStatus === 'pending' ? 'bg-orange-100 ring-2 ring-orange-500 ring-offset-2 border-orange-500' : 'bg-orange-50 border-orange-100 hover:bg-orange-100'}`}>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600">Pending</p>
-                            <p className="text-3xl font-black text-orange-700">{stats.pending}</p>
+                        <button onClick={() => setFilterStatus('pending')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'pending' ? 'bg-orange-100 ring-2 ring-orange-500 border-orange-500' : 'bg-orange-50 border-orange-100'}`}>
+                            <p className="text-[10px] font-bold uppercase text-orange-600">Pending</p>
+                            <p className="text-2xl font-black text-orange-700">{stats.pending}</p>
                         </button>
-                        <button onClick={() => setFilterStatus('progress')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center aspect-[3/4] w-32 cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-md ${filterStatus === 'progress' ? 'bg-blue-100 ring-2 ring-blue-500 ring-offset-2 border-blue-500' : 'bg-blue-50 border-blue-100 hover:bg-blue-100'}`}>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Progress</p>
-                            <p className="text-3xl font-black text-blue-700">{stats.progress}</p>
+                        <button onClick={() => setFilterStatus('progress')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'progress' ? 'bg-blue-100 ring-2 ring-blue-500 border-blue-500' : 'bg-blue-50 border-blue-100'}`}>
+                            <p className="text-[10px] font-bold uppercase text-blue-600">Progress</p>
+                            <p className="text-2xl font-black text-blue-700">{stats.progress}</p>
                         </button>
-                        <button onClick={() => setFilterStatus('done')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center aspect-[3/4] w-32 cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-md ${filterStatus === 'done' ? 'bg-emerald-100 ring-2 ring-emerald-500 ring-offset-2 border-emerald-500' : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100'}`}>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Done</p>
-                            <p className="text-3xl font-black text-emerald-700">{stats.done}</p>
+                        <button onClick={() => setFilterStatus('done')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'done' ? 'bg-emerald-100 ring-2 ring-emerald-500 border-emerald-500' : 'bg-emerald-50 border-emerald-100'}`}>
+                            <p className="text-[10px] font-bold uppercase text-emerald-600">Done</p>
+                            <p className="text-2xl font-black text-emerald-700">{stats.done}</p>
                         </button>
                     </div>
 
                     {/* TASK SECTION */}
-                    <div className="bg-white rounded-2xl border">
+                    <div className="bg-white rounded-2xl border min-h-[500px]">
                         <div className="p-6 flex flex-col md:flex-row justify-between items-center gap-4 border-b">
-                            <h3 className="text-xl font-bold">Daftar Tugas</h3>
+                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                {currentFilter === 'archive' ? '🗑️ Sampah' : '📝 Daftar Tugas'}
+                            </h3>
+                            
                             <div className="flex gap-3 w-full md:w-auto">
-                                <select className="rounded-lg border-gray-300 text-sm focus:ring-purple-500 focus:border-purple-500 cursor-pointer" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                                <select 
+                                    className="rounded-lg border-gray-300 text-sm focus:ring-purple-500 focus:border-purple-500 cursor-pointer"
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                >
                                     <option value="all">Semua Status</option>
                                     <option value="pending">⏳ Pending</option>
                                     <option value="progress">🔥 Progress</option>
                                     <option value="done">✅ Done</option>
                                 </select>
-                                <PrimaryButton onClick={() => openModal()} className="whitespace-nowrap">+ Tambah</PrimaryButton>
+
+                                {currentFilter !== 'archive' && (
+                                    <PrimaryButton onClick={() => openModal()} className="whitespace-nowrap">
+                                        + Tambah Baru
+                                    </PrimaryButton>
+                                )}
                             </div>
                         </div>
 
                         <div className="p-6">
                             {filteredTasks.length === 0 ? (
-                                <div className="text-center py-10 text-gray-400">
-                                    {filterStatus === 'all' ? 'Belum ada tugas sama sekali. Yuk tambah baru! 🚀' : `Belum ada tugas dengan status ${STATUS[filterStatus]?.label}.`}
+                                <div className="text-center py-20">
+                                    <p className="text-4xl mb-4">✨</p>
+                                    <p className="text-gray-400 font-medium">
+                                        {currentFilter === 'today' ? 'Tidak ada tugas untuk hari ini. Santai dulu!' :
+                                         currentFilter === 'archive' ? 'Tong sampah bersih.' :
+                                         'Belum ada tugas di sini.'}
+                                    </p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {filteredTasks.map(task => (
-                                        <div key={task.id} className={`aspect-[3/4] rounded-2xl border p-4 flex flex-col justify-between ${STATUS[task.status].card} shadow-[inset_0_0_0_1px_rgba(0,0,0,0.04)] hover:shadow-xl hover:-translate-y-1 transition`}>
-                                            <div className="flex justify-between">
-                                                <span className={`text-xs px-3 py-1 rounded-full border font-semibold ${STATUS[task.status].badge}`}>{STATUS[task.status].label}</span>
-                                                <div className="flex gap-1">
-                                                    <button onClick={() => openModal(task)} className="hover:scale-110 transition" aria-label="Edit tugas">✏️</button>
-                                                    <button onClick={() => handleDelete(task.id)} className="hover:scale-110 transition" aria-label="Hapus tugas">🗑️</button>
-                                                </div>
+                                    <div
+                                        key={task.id}
+                                        className={`
+                                            relative group rounded-xl border p-5 flex flex-col justify-between
+                                            ${STATUS[task.status].card}
+                                            hover:shadow-lg hover:-translate-y-1 transition-all duration-300
+                                        `}
+                                    >
+                                        {/* === HEADER KARTU (Status & Actions) === */}
+                                        <div className="flex justify-between items-start mb-3">
+                                            
+                                            {/* BAGIAN KIRI: Gabungan Status + Kategori */}
+                                            <div className="flex flex-wrap items-center gap-2 pr-2"> {/* Kasih gap biar ada jarak */}
+                                                
+                                                {/* 1. Status Badge */}
+                                                <span className={`text-[10px] px-2 py-1 rounded-full border font-bold uppercase tracking-wide ${STATUS[task.status].badge}`}>
+                                                    {STATUS[task.status].label}
+                                                </span>
+
+                                                {/* 2. Kategori Label (PINDAH SINI) */}
+                                                {task.category && (
+                                                    <span className="text-[10px] px-2 py-1 rounded-full border bg-white/60 border-gray-200 text-gray-600 font-medium flex items-center gap-1 truncate max-w-[120px]">
+                                                        📂 {task.category.name}
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="text-center">
-                                                <h4 className="font-bold text-lg mt-4 mb-2 leading-tight">{task.title}</h4>
-                                                <p className="text-xs text-gray-600 line-clamp-4 leading-relaxed">{task.description || 'Tidak ada deskripsi'}</p>
-                                            </div>
-                                            <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-center border-t border-black/5 pt-3 mt-2">
-                                                {new Date(task.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})}
+                                            
+                                            {/* BAGIAN KANAN: Action Buttons (Edit/Delete) */}
+                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow-sm">
+                                                {currentFilter !== 'archive' ? (
+                                                    <>
+                                                        <button onClick={() => openModal(task)} className="text-gray-400 hover:text-purple-600 transition-colors" aria-label="Edit">
+                                                            ✏️
+                                                        </button>
+                                                        <button onClick={() => handleDelete(task.id)} className="text-gray-400 hover:text-red-600 transition-colors" aria-label="Archive">
+                                                            🗑️
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button onClick={() => handleRestore(task.id)} className="text-gray-400 hover:text-emerald-600 transition-colors" aria-label="Restore">
+                                                            ♻️
+                                                        </button>
+                                                        <button onClick={() => handleDelete(task.id)} className="text-gray-400 hover:text-red-600 transition-colors" aria-label="Force Delete">
+                                                            🔥
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
+
+                                        {/* === ISI KARTU === */}
+                                        <div className="mb-4">
+                                            <h4 className="font-bold text-gray-800 text-lg leading-tight mb-2">
+                                                {task.title}
+                                            </h4>
+                                            <p className="text-xs text-gray-500 line-clamp-3 leading-relaxed">
+                                                {task.description || 'Tidak ada deskripsi detail.'}
+                                            </p>
+                                        </div>
+
+                                        {/* === FOOTER KARTU (Tanggal) === */}
+                                        <div className="pt-3 border-t border-black/5 flex items-center justify-between text-xs text-gray-400 font-medium">
+                                            <span>Dibuat: {new Date(task.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}</span>
+                                            
+                                            {task.due_date && (
+                                                <span className={`flex items-center gap-1 ${new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-red-500 font-bold' : 'text-purple-600'}`}>
+                                                    🗓️ {new Date(task.due_date).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* ⚠️ PENTING: Hapus kode label kategori yang lama (Absolute Position) di bawah sini biar ga dobel */}
+                                    </div>
                                     ))}
                                 </div>
                             )}
@@ -194,14 +312,67 @@ export default function Dashboard({ auth, tasks, flash = {} }) {
                 </div>
             </div>
 
+            {/* MODAL INPUT */}
             <Modal show={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <div className="p-6">
-                    <h2 className="text-lg font-bold mb-4">{isEditing ? 'Edit Tugas' : 'Tambah Tugas'}</h2>
+                    <h2 className="text-lg font-bold mb-4 text-gray-800">
+                        {isEditing ? 'Edit Tugas' : 'Tambah Tugas Baru'}
+                    </h2>
+
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div><InputLabel value="Judul" /><TextInput className="w-full mt-1" value={data.title} onChange={e => setData('title', e.target.value)} /><InputError message={errors.title} /></div>
-                        <div><InputLabel value="Status" /><select className="w-full rounded border-gray-300 mt-1" value={data.status} onChange={e => setData('status', e.target.value)}><option value="pending">Pending</option><option value="progress">Progress</option><option value="done">Done</option></select></div>
-                        <div><InputLabel value="Deskripsi" /><textarea className="w-full rounded border-gray-300 mt-1" rows="4" value={data.description} onChange={e => setData('description', e.target.value)} /></div>
-                        <div className="flex justify-end gap-3 mt-6"><SecondaryButton onClick={() => setIsModalOpen(false)}>Batal</SecondaryButton><PrimaryButton disabled={processing}>Simpan</PrimaryButton></div>
+                        {/* Judul */}
+                        <div>
+                            <InputLabel value="Judul Tugas" />
+                            <TextInput className="w-full mt-1" value={data.title} onChange={e => setData('title', e.target.value)} placeholder="Contoh: Belajar Laravel" />
+                            <InputError message={errors.title} />
+                        </div>
+
+                        {/* Status & Kategori */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <InputLabel value="Status" />
+                                <select className="w-full rounded-lg border-gray-300 mt-1 focus:ring-purple-500 focus:border-purple-500" value={data.status} onChange={e => setData('status', e.target.value)}>
+                                    <option value="pending">⏳ Pending</option>
+                                    <option value="progress">🔥 Progress</option>
+                                    <option value="done">✅ Done</option>
+                                </select>
+                            </div>
+                            
+                            {/* INPUT KATEGORI (DROPDOWN) */}
+                            <div>
+                                <InputLabel value="Kategori (Project)" />
+                                <select 
+                                    className="w-full rounded-lg border-gray-300 mt-1 focus:ring-purple-500 focus:border-purple-500"
+                                    value={data.category_id}
+                                    onChange={e => setData('category_id', e.target.value)}
+                                >
+                                    <option value="">📂 Masuk Inbox (Tanpa Kategori)</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Tanggal */}
+                        <div>
+                            <InputLabel value="Tenggat Waktu (Opsional)" />
+                            <TextInput type="date" className="w-full mt-1 cursor-pointer" value={data.due_date} onChange={e => setData('due_date', e.target.value)} />
+                            <InputError message={errors.due_date} />
+                        </div>
+
+                        {/* Deskripsi */}
+                        <div>
+                            <InputLabel value="Deskripsi Detail" />
+                            <textarea className="w-full rounded-lg border-gray-300 mt-1 focus:ring-purple-500 focus:border-purple-500" rows="3" value={data.description} onChange={e => setData('description', e.target.value)} placeholder="Tulis detail tugas di sini..." />
+                        </div>
+
+                        <div className="flex justify-end gap-3 mt-6">
+                            <SecondaryButton onClick={() => setIsModalOpen(false)}>Batal</SecondaryButton>
+                            <PrimaryButton disabled={processing}>
+                                {isEditing ? 'Update Tugas' : 'Simpan Tugas'}
+                            </PrimaryButton>
+                        </div>
                     </form>
                 </div>
             </Modal>
