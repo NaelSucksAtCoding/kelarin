@@ -35,7 +35,7 @@ class TaskController extends Controller
         $request->user()->tasks()->create($validated);
 
         // 3. Redirect balik (Inertia bakal otomatis refresh halaman tanpa reload)
-        return to_route('dashboard');
+        return to_route('dashboard')->with('success', 'Tugas baru berhasil dibuat! 🚀');
     }
     // Method buat UPDATE data
     public function update(Request $request, Task $task)
@@ -55,7 +55,7 @@ class TaskController extends Controller
         // 3. Update database
         $task->update($validated);
 
-        return to_route('dashboard');
+        return to_route('dashboard')->with('success', 'Tugas berhasil diupdate! ✨');
     }
 
     // Method buat DELETE data
@@ -69,6 +69,6 @@ class TaskController extends Controller
         // 2. Hapus dari database
         $task->delete();
 
-        return to_route('dashboard');
+        return to_route('dashboard')->with('success', 'Tugas berhasil dihapus! 🗑️');
     }
 }
