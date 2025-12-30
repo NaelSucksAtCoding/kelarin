@@ -19,6 +19,20 @@ Route::get('/dashboard', [TaskController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
+Route::post('/tasks', [TaskController::class, 'store'])
+    ->middleware(['auth', 'verified'])
+    ->name('tasks.store');
+
+    // Route Update (Edit)
+Route::put('/tasks/{task}', [TaskController::class, 'update'])
+    ->middleware(['auth', 'verified'])
+    ->name('tasks.update');
+
+// Route Delete (Hapus)
+Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])
+    ->middleware(['auth', 'verified'])
+    ->name('tasks.destroy');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
