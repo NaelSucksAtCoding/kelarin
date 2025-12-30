@@ -42,6 +42,27 @@ class TaskController extends Controller
             }
         }
 
+        // --- 4. SMART SORTING (BARU & CANGGIH!) ---
+        // Logic: 
+        // 1. Prioritas: High > Medium > Low
+        // 2. Deadline: Yang ada tanggalnya & mepet > Yang gak ada tanggal
+        // 3. Waktu Buat: Terbaru > Terlama
+        
+        $query->orderByRaw("
+            CASE priority 
+                WHEN 'high' THEN 1 
+                WHEN 'medium' THEN 2 
+                WHEN 'low' THEN 3 
+                ELSE 4 
+            END
+        ");
+        
+        // Sort by Due Date (NULLs last - biar tugas tanpa tanggal di bawah)
+        $query->orderByRaw("CASE WHEN due_date IS NULL THEN 1 ELSE 0 END, due_date ASC");
+        
+        // Fallback: Created At
+        $query->orderBy('created_at', 'desc');
+
         // Ambil Tugas
         $tasks = $query->with('category')->orderBy('created_at', 'desc')->get();
         // Ambil Daftar Kategori milik User (Buat Sidebar & Dropdown)
@@ -53,6 +74,7 @@ class TaskController extends Controller
             'currentFilter' => $request->input('filter', 'inbox'),
             'currentCategoryId' => $request->input('category_id'),
             'searchTerm' => $request->input('search'), // <--- Kirim balik search term ke frontend
+            'flash' => session('flash') ?? [], // Pastikan flash dikirim kalau belum
         ]);
     }
 
