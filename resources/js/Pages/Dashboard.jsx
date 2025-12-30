@@ -8,68 +8,53 @@ import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import Swal from 'sweetalert2';
-
-// ⚠️ Pastikan baris ini sesuai sama lokasi logo lu, kadang beda folder/nama file
 import logoKelarin from '../../images/kelarinlogo.svg'; 
 
-// Props: categories dikasih default [] biar gak error layar putih
 export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'inbox', categories = [], currentCategoryId = null, searchTerm = '' }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [searchQuery, setSearchQuery] = useState(searchTerm || '');
-    
-    // Filter Lokal (Status)
     const [filterStatus, setFilterStatus] = useState('all');
 
-    // useForm dengan field lengkap
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
-        title: '',
-        description: '',
-        status: 'pending',
-        due_date: '', 
-        category_id: '', // <--- Field Kategori
+        title: '', description: '', status: 'pending', due_date: '', category_id: '',
     });
 
-    // Judul Halaman Dinamis
     const pageTitles = {
-        'today': 'Tugas Hari Ini ☀️',
-        'upcoming': 'Mendatang 🗓️',
-        'archive': 'Arsip / Sampah 📦',
-        'inbox': 'Inbox (Semua Tugas) 📥'
+        'today': 'Tugas Hari Ini ☀️', 'upcoming': 'Mendatang 🗓️', 'archive': 'Arsip / Sampah 📦', 'inbox': 'Inbox (Semua Tugas) 📥'
     };
     
-    // Logic Judul: Kalau lagi filter kategori, ambil nama kategorinya dari list
     let currentTitle = pageTitles[currentFilter] || 'Daftar Tugas';
     if (currentCategoryId) {
         const activeCat = categories.find(c => c.id == currentCategoryId);
         if (activeCat) currentTitle = `Project: ${activeCat.name} 📂`;
     }
 
-    // Pop Up Sukses
+    // --- UPDATE DI SINI: FLASH MESSAGE DARK MODE ---
     useEffect(() => {
         if (flash?.success) {
-            Swal.fire({
-                title: 'Berhasil!',
-                text: flash.success,
-                icon: 'success',
-                confirmButtonText: 'Mantap',
-                confirmButtonColor: '#9333ea',
-                timer: 3000,
+            const isDark = document.documentElement.classList.contains('dark');
+            Swal.fire({ 
+                title: 'Berhasil!', 
+                text: flash.success, 
+                icon: 'success', 
+                confirmButtonText: 'Mantap', 
+                confirmButtonColor: '#9333ea', 
+                timer: 3000, 
                 timerProgressBar: true,
+                // WARNA DARK MODE
+                background: isDark ? '#1f2937' : '#fff',
+                color: isDark ? '#fff' : '#1f2937',
             });
         }
     }, [flash]);
 
-    // --- LOGIKA FILTER GABUNGAN (CLIENT-SIDE INSTANT) ---
-    // Ini akan jalan setiap kali lu ngetik atau ganti dropdown status.
+    // FILTER LOGIC
     const finalFilteredTasks = tasks.filter(task => {
         const statusMatch = filterStatus === 'all' || task.status === filterStatus;
         const query = searchQuery.toLowerCase().trim();
-        const searchMatch = 
-            !query || 
-            task.title.toLowerCase().includes(query) || 
-            (task.description && task.description.toLowerCase().includes(query));
+        const searchMatch = !query || task.title.toLowerCase().includes(query) || (task.description && task.description.toLowerCase().includes(query));
         return statusMatch && searchMatch;
     });
 
@@ -80,159 +65,121 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
         done: finalFilteredTasks.filter(t => t.status === 'done').length,
     };
 
-    // Buka Modal (Load Data)
     const openModal = (task = null) => {
         clearErrors();
         if (task) {
-            setIsEditing(true);
-            setEditingId(task.id);
+            setIsEditing(true); setEditingId(task.id);
             setData({
-                title: task.title,
-                description: task.description || '',
-                status: task.status,
-                due_date: task.due_date ? task.due_date.split('T')[0] : '', 
-                category_id: task.category_id || '', // <--- Load Kategori
+                title: task.title, description: task.description || '', status: task.status,
+                due_date: task.due_date ? task.due_date.split('T')[0] : '', category_id: task.category_id || '',
             });
         } else {
-            setIsEditing(false);
-            setEditingId(null);
-            reset();
+            setIsEditing(false); setEditingId(null); reset();
         }
         setIsModalOpen(true);
     };
 
-    const handleSearch = (e) => {
-        if (e.key === 'Enter') {
-            setFilterStatus('all');
-            router.get(route('dashboard'), { 
-                search: searchQuery, // Kirim kata kunci
-            }, { 
-                preserveState: true, // Biar gak kedip parah
-                replace: true 
-            });
-        }
-    };
-
     const handleSubmit = (e) => {
         e.preventDefault();
-        isEditing
-            ? put(route('tasks.update', editingId), { onSuccess: close })
-            : post(route('tasks.store'), { onSuccess: close });
-
-        function close() {
-            setIsModalOpen(false);
-            reset();
-        }
+        const close = () => { setIsModalOpen(false); reset(); };
+        isEditing ? put(route('tasks.update', editingId), { onSuccess: close }) : post(route('tasks.store'), { onSuccess: close });
     };
 
+    // --- UPDATE DI SINI: DELETE DARK MODE ---
     const handleDelete = (id) => {
-        // Cek lagi di Arsip atau bukan buat bedain pesan
         const isArchive = currentFilter === 'archive';
+        const isDark = document.documentElement.classList.contains('dark');
         
         Swal.fire({
             title: isArchive ? 'Hapus Permanen?' : 'Buang ke Sampah?',
-            text: isArchive 
-                ? "Data bakal hilang SELAMANYA gak bisa balik!" 
-                : "Tenang, masih bisa dibalikin dari menu Arsip.",
-            icon: isArchive ? 'error' : 'warning', // Merah kalau permanen, Kuning kalau sampah
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
+            text: isArchive ? "Data bakal hilang SELAMANYA gak bisa balik!" : "Tenang, masih bisa dibalikin dari menu Arsip.",
+            icon: isArchive ? 'error' : 'warning',
+            showCancelButton: true, 
+            confirmButtonColor: '#d33', 
             confirmButtonText: isArchive ? 'Ya, Musnahkan!' : 'Ya, Buang!',
-            cancelButtonText: 'Batal'
+            // WARNA DARK MODE
+            background: isDark ? '#1f2937' : '#fff',
+            color: isDark ? '#fff' : '#1f2937',
         }).then((result) => {
-            if (result.isConfirmed) {
-                router.delete(route('tasks.destroy', id));
-            }
+            if (result.isConfirmed) router.delete(route('tasks.destroy', id));
         });
     };
 
+    // --- UPDATE DI SINI: RESTORE DARK MODE ---
     const handleRestore = (id) => {
-        Swal.fire({
-            title: 'Balikin Tugas?',
-            text: "Tugas ini bakal aktif lagi dan masuk ke foldernya.",
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#10b981', // Hijau Emerald
-            cancelButtonColor: '#6b7280',
+        const isDark = document.documentElement.classList.contains('dark');
+        
+        Swal.fire({ 
+            title: 'Balikin Tugas?', 
+            text: "Tugas ini bakal aktif lagi dan masuk ke foldernya.", 
+            icon: 'question', 
+            showCancelButton: true, 
+            confirmButtonColor: '#10b981', 
             confirmButtonText: 'Ya, Balikin!',
-            cancelButtonText: 'Batal'
+            // WARNA DARK MODE
+            background: isDark ? '#1f2937' : '#fff',
+            color: isDark ? '#fff' : '#1f2937',
         }).then((result) => {
-            if (result.isConfirmed) {
-                // Pake router.patch sesuai route di web.php
-                router.patch(route('tasks.restore', id));
-            }
+            if (result.isConfirmed) router.patch(route('tasks.restore', id));
         });
     };
 
     const STATUS = {
-        pending: { label: 'Pending', badge: 'bg-orange-100 text-orange-700 border-orange-300', card: 'bg-orange-50' },
-        progress: { label: 'Progress', badge: 'bg-blue-100 text-blue-700 border-blue-300', card: 'bg-blue-50' },
-        done: { label: 'Done', badge: 'bg-emerald-100 text-emerald-700 border-emerald-300', card: 'bg-emerald-50' },
+        pending: { label: 'Pending', badge: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700', card: 'bg-orange-50 dark:bg-gray-800 dark:border-gray-700' },
+        progress: { label: 'Progress', badge: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700', card: 'bg-blue-50 dark:bg-gray-800 dark:border-gray-700' },
+        done: { label: 'Done', badge: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700', card: 'bg-emerald-50 dark:bg-gray-800 dark:border-gray-700' },
     };
 
     return (
         <AuthenticatedLayout
-            user={auth.user}
-            categories={categories} // <--- Kirim ke Sidebar
-            currentCategoryId={currentCategoryId}
-            header={
-                <div className="flex items-center gap-4">
-                    <h2 className="text-2xl font-bold text-gray-800">
-                        {currentTitle}
-                    </h2>
-                </div>
-            }
+            user={auth.user} categories={categories} currentCategoryId={currentCategoryId}
+            header={<div className="flex items-center gap-4"><h2 className="text-2xl font-bold text-gray-800 dark:text-white transition-colors">{currentTitle}</h2></div>}
         >
             <Head title="Dashboard" />
 
-            <div className="py-8 bg-gray-50 min-h-screen">
+            <div className="py-8 bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
                 <div className="max-w-7xl mx-auto px-6 space-y-8">
-
                     {/* STAT CARDS */}
                     <div className="flex flex-wrap gap-4 justify-center">
-                        <button onClick={() => setFilterStatus('all')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'all' ? 'bg-white ring-2 ring-purple-500 border-purple-500' : 'bg-white border-gray-200'}`}>
+                        <button onClick={() => setFilterStatus('all')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'all' ? 'bg-white ring-2 ring-purple-500 border-purple-500 dark:bg-gray-800' : 'bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700'}`}>
                             <p className="text-[10px] font-bold uppercase text-gray-400">Total</p>
-                            <p className="text-2xl font-black text-gray-700">{stats.total}</p>
+                            <p className="text-2xl font-black text-gray-700 dark:text-white">{stats.total}</p>
                         </button>
-                        <button onClick={() => setFilterStatus('pending')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'pending' ? 'bg-orange-100 ring-2 ring-orange-500 border-orange-500' : 'bg-orange-50 border-orange-100'}`}>
-                            <p className="text-[10px] font-bold uppercase text-orange-600">Pending</p>
-                            <p className="text-2xl font-black text-orange-700">{stats.pending}</p>
+                        <button onClick={() => setFilterStatus('pending')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'pending' ? 'bg-orange-100 ring-2 ring-orange-500 border-orange-500 dark:bg-gray-800' : 'bg-orange-50 border-orange-100 dark:bg-gray-800 dark:border-gray-700'}`}>
+                            <p className="text-[10px] font-bold uppercase text-orange-600 dark:text-orange-400">Pending</p>
+                            <p className="text-2xl font-black text-orange-700 dark:text-orange-300">{stats.pending}</p>
                         </button>
-                        <button onClick={() => setFilterStatus('progress')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'progress' ? 'bg-blue-100 ring-2 ring-blue-500 border-blue-500' : 'bg-blue-50 border-blue-100'}`}>
-                            <p className="text-[10px] font-bold uppercase text-blue-600">Progress</p>
-                            <p className="text-2xl font-black text-blue-700">{stats.progress}</p>
+                        <button onClick={() => setFilterStatus('progress')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'progress' ? 'bg-blue-100 ring-2 ring-blue-500 border-blue-500 dark:bg-gray-800' : 'bg-blue-50 border-blue-100 dark:bg-gray-800 dark:border-gray-700'}`}>
+                            <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400">Progress</p>
+                            <p className="text-2xl font-black text-blue-700 dark:text-blue-300">{stats.progress}</p>
                         </button>
-                        <button onClick={() => setFilterStatus('done')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'done' ? 'bg-emerald-100 ring-2 ring-emerald-500 border-emerald-500' : 'bg-emerald-50 border-emerald-100'}`}>
-                            <p className="text-[10px] font-bold uppercase text-emerald-600">Done</p>
-                            <p className="text-2xl font-black text-emerald-700">{stats.done}</p>
+                        <button onClick={() => setFilterStatus('done')} className={`rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 transition-all hover:scale-105 ${filterStatus === 'done' ? 'bg-emerald-100 ring-2 ring-emerald-500 border-emerald-500 dark:bg-gray-800' : 'bg-emerald-50 border-emerald-100 dark:bg-gray-800 dark:border-gray-700'}`}>
+                            <p className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">Done</p>
+                            <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300">{stats.done}</p>
                         </button>
                     </div>
 
                     {/* TASK SECTION */}
-                    <div className="bg-white rounded-2xl border min-h-[500px]">
-                        <div className="p-6 flex flex-col md:flex-row justify-between items-center gap-4 border-b">
-                            <h3 className="text-xl font-bold flex items-center gap-2">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl border dark:border-gray-700 min-h-[500px] transition-colors">
+                        <div className="p-6 flex flex-col md:flex-row justify-between items-center gap-4 border-b dark:border-gray-700">
+                            <h3 className="text-xl font-bold flex items-center gap-2 dark:text-white">
                                 {currentFilter === 'archive' ? '🗑️ Sampah' : '📝 Daftar Tugas'}
                             </h3>
 
                             <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                                {/* --- SEARCH BAR (BARU) --- */}
                                 <div className="relative">
-                                        <TextInput 
-                                            type="text"
-                                            className="pl-9 w-full md:w-64 transition-all focus:w-full md:focus:w-72" // Kasih efek melebar dikit pas diklik biar keren
-                                            placeholder="Ketik untuk mencari..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            // onKeyDown dihapus aja, udah gak perlu
-                                        />
+                                    <TextInput 
+                                        type="text"
+                                        className="pl-9 w-full md:w-64 transition-all focus:w-full md:focus:w-72 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                                        placeholder="Ketik untuk mencari..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                                 </div>
 
-                                {/* Filter Status Lokal */}
                                 <select 
-                                    className="rounded-lg border-gray-300 text-sm focus:ring-purple-500 focus:border-purple-500 cursor-pointer"
+                                    className="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500 cursor-pointer"
                                     value={filterStatus}
                                     onChange={(e) => setFilterStatus(e.target.value)}
                                 >
@@ -242,7 +189,6 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                                     <option value="done">✅ Done</option>
                                 </select>
 
-                                {/* Tombol Tambah */}
                                 {currentFilter !== 'archive' && (
                                     <PrimaryButton onClick={() => openModal()} className="whitespace-nowrap flex justify-center">
                                         + Tambah Baru
@@ -264,82 +210,56 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                             ) : (
                                 <div 
                                     key={searchQuery} 
-                                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up 1s"
+                                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up"
                                 >
                                     {finalFilteredTasks.map(task => (
                                     <div
                                         key={task.id}
-                                        className={`
-                                            relative group rounded-xl border p-5 flex flex-col justify-between
-                                            ${STATUS[task.status].card}
-                                            hover:shadow-lg hover:-translate-y-1 transition-all duration-300
-                                        `}
+                                        className={`relative group rounded-xl border p-5 flex flex-col justify-between ${STATUS[task.status].card} hover:shadow-lg hover:-translate-y-1 transition-all duration-300`}
                                     >
-                                        {/* === HEADER KARTU (Status & Actions) === */}
                                         <div className="flex justify-between items-start mb-3">
-                                            
-                                            {/* BAGIAN KIRI: Gabungan Status + Kategori */}
-                                            <div className="flex flex-wrap items-center gap-2 pr-2"> {/* Kasih gap biar ada jarak */}
-                                                
-                                                {/* 1. Status Badge */}
+                                            <div className="flex flex-wrap items-center gap-2 pr-2">
                                                 <span className={`text-[10px] px-2 py-1 rounded-full border font-bold uppercase tracking-wide ${STATUS[task.status].badge}`}>
                                                     {STATUS[task.status].label}
                                                 </span>
-
-                                                {/* 2. Kategori Label (PINDAH SINI) */}
                                                 {task.category && (
-                                                    <span className="text-[10px] px-2 py-1 rounded-full border bg-white/60 border-gray-200 text-gray-600 font-medium flex items-center gap-1 truncate max-w-[120px]">
+                                                    <span className="text-[10px] px-2 py-1 rounded-full border bg-white/60 dark:bg-gray-700/60 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 font-medium flex items-center gap-1 truncate max-w-[120px]">
                                                         📂 {task.category.name}
                                                     </span>
                                                 )}
                                             </div>
-                                            
-                                            {/* BAGIAN KANAN: Action Buttons (Edit/Delete) */}
-                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow-sm">
+                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm p-1 rounded-lg shadow-sm">
                                                 {currentFilter !== 'archive' ? (
                                                     <>
-                                                        <button onClick={() => openModal(task)} className="text-gray-400 hover:text-purple-600 transition-colors" aria-label="Edit">
-                                                            ✏️
-                                                        </button>
-                                                        <button onClick={() => handleDelete(task.id)} className="text-gray-400 hover:text-red-600 transition-colors" aria-label="Archive">
-                                                            🗑️
-                                                        </button>
+                                                        <button onClick={() => openModal(task)} className="text-gray-400 hover:text-purple-600 transition-colors" aria-label="Edit">✏️</button>
+                                                        <button onClick={() => handleDelete(task.id)} className="text-gray-400 hover:text-red-600 transition-colors" aria-label="Archive">🗑️</button>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <button onClick={() => handleRestore(task.id)} className="text-gray-400 hover:text-emerald-600 transition-colors" aria-label="Restore">
-                                                            ♻️
-                                                        </button>
-                                                        <button onClick={() => handleDelete(task.id)} className="text-gray-400 hover:text-red-600 transition-colors" aria-label="Force Delete">
-                                                            🔥
-                                                        </button>
+                                                        <button onClick={() => handleRestore(task.id)} className="text-gray-400 hover:text-emerald-600 transition-colors" aria-label="Restore">♻️</button>
+                                                        <button onClick={() => handleDelete(task.id)} className="text-gray-400 hover:text-red-600 transition-colors" aria-label="Force Delete">🔥</button>
                                                     </>
                                                 )}
                                             </div>
                                         </div>
 
-                                        {/* === ISI KARTU === */}
                                         <div className="mb-4">
-                                            <h4 className="font-bold text-gray-800 text-lg leading-tight mb-2">
+                                            <h4 className="font-bold text-gray-800 dark:text-white text-lg leading-tight mb-2">
                                                 {task.title}
                                             </h4>
-                                            <p className="text-xs text-gray-500 line-clamp-3 leading-relaxed">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3 leading-relaxed">
                                                 {task.description || 'Tidak ada deskripsi detail.'}
                                             </p>
                                         </div>
 
-                                        {/* === FOOTER KARTU (Tanggal) === */}
-                                        <div className="pt-3 border-t border-black/5 flex items-center justify-between text-xs text-gray-400 font-medium">
+                                        <div className="pt-3 border-t border-black/5 dark:border-white/10 flex items-center justify-between text-xs text-gray-400 font-medium">
                                             <span>Dibuat: {new Date(task.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}</span>
-                                            
                                             {task.due_date && (
-                                                <span className={`flex items-center gap-1 ${new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-red-500 font-bold' : 'text-purple-600'}`}>
+                                                <span className={`flex items-center gap-1 ${new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-red-500 font-bold' : 'text-purple-600 dark:text-purple-400'}`}>
                                                     🗓️ {new Date(task.due_date).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}
                                                 </span>
                                             )}
                                         </div>
-
-                                        {/* ⚠️ PENTING: Hapus kode label kategori yang lama (Absolute Position) di bawah sini biar ga dobel */}
                                     </div>
                                     ))}
                                 </div>
@@ -351,38 +271,28 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
 
             {/* MODAL INPUT */}
             <Modal show={isModalOpen} onClose={() => setIsModalOpen(false)}>
-                <div className="p-6">
-                    <h2 className="text-lg font-bold mb-4 text-gray-800">
+                <div className="p-6 dark:bg-gray-800 dark:text-white">
+                    <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">
                         {isEditing ? 'Edit Tugas' : 'Tambah Tugas Baru'}
                     </h2>
-
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Judul */}
                         <div>
-                            <InputLabel value="Judul Tugas" />
-                            <TextInput className="w-full mt-1" value={data.title} onChange={e => setData('title', e.target.value)} placeholder="Contoh: Belajar Laravel" />
+                            <InputLabel value="Judul Tugas" className="dark:text-gray-300" />
+                            <TextInput className="w-full mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value={data.title} onChange={e => setData('title', e.target.value)} placeholder="Contoh: Belajar Laravel" />
                             <InputError message={errors.title} />
                         </div>
-
-                        {/* Status & Kategori */}
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <InputLabel value="Status" />
-                                <select className="w-full rounded-lg border-gray-300 mt-1 focus:ring-purple-500 focus:border-purple-500" value={data.status} onChange={e => setData('status', e.target.value)}>
+                                <InputLabel value="Status" className="dark:text-gray-300" />
+                                <select className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white mt-1 focus:ring-purple-500 focus:border-purple-500" value={data.status} onChange={e => setData('status', e.target.value)}>
                                     <option value="pending">⏳ Pending</option>
                                     <option value="progress">🔥 Progress</option>
                                     <option value="done">✅ Done</option>
                                 </select>
                             </div>
-                            
-                            {/* INPUT KATEGORI (DROPDOWN) */}
                             <div>
-                                <InputLabel value="Kategori (Project)" />
-                                <select 
-                                    className="w-full rounded-lg border-gray-300 mt-1 focus:ring-purple-500 focus:border-purple-500"
-                                    value={data.category_id}
-                                    onChange={e => setData('category_id', e.target.value)}
-                                >
+                                <InputLabel value="Kategori (Project)" className="dark:text-gray-300" />
+                                <select className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white mt-1" value={data.category_id} onChange={e => setData('category_id', e.target.value)}>
                                     <option value="">📂 Masuk Inbox (Tanpa Kategori)</option>
                                     {categories.map(cat => (
                                         <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -390,22 +300,17 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                                 </select>
                             </div>
                         </div>
-
-                        {/* Tanggal */}
                         <div>
-                            <InputLabel value="Tenggat Waktu (Opsional)" />
-                            <TextInput type="date" className="w-full mt-1 cursor-pointer" value={data.due_date} onChange={e => setData('due_date', e.target.value)} />
+                            <InputLabel value="Tenggat Waktu (Opsional)" className="dark:text-gray-300" />
+                            <TextInput type="date" className="w-full mt-1 cursor-pointer dark:bg-gray-700 dark:border-gray-600 dark:text-white" value={data.due_date} onChange={e => setData('due_date', e.target.value)} />
                             <InputError message={errors.due_date} />
                         </div>
-
-                        {/* Deskripsi */}
                         <div>
-                            <InputLabel value="Deskripsi Detail" />
-                            <textarea className="w-full rounded-lg border-gray-300 mt-1 focus:ring-purple-500 focus:border-purple-500" rows="3" value={data.description} onChange={e => setData('description', e.target.value)} placeholder="Tulis detail tugas di sini..." />
+                            <InputLabel value="Deskripsi Detail" className="dark:text-gray-300" />
+                            <textarea className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white mt-1 focus:ring-purple-500 focus:border-purple-500" rows="3" value={data.description} onChange={e => setData('description', e.target.value)} placeholder="Tulis detail tugas di sini..." />
                         </div>
-
                         <div className="flex justify-end gap-3 mt-6">
-                            <SecondaryButton onClick={() => setIsModalOpen(false)}>Batal</SecondaryButton>
+                            <SecondaryButton onClick={() => setIsModalOpen(false)} className="dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Batal</SecondaryButton>
                             <PrimaryButton disabled={processing}>
                                 {isEditing ? 'Update Tugas' : 'Simpan Tugas'}
                             </PrimaryButton>
