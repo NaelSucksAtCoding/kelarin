@@ -14,13 +14,21 @@ class TaskController extends Controller
     {
         $query = Task::where('user_id', auth()->id());
 
-        // --- LOGIKA FILTER UPDATE ---
+        // --- 1. FITUR SEARCH (BARU) ---
+        if ($request->input('search')) {
+            $query->where(function($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->input('search') . '%')
+                  ->orWhere('description', 'like', '%' . $request->input('search') . '%');
+            });
+        }
+
+        // 2. FILTER CATEGORY
         if ($request->has('category_id')) {
-            // Filter berdasarkan Kategori Spesifik
             $query->where('category_id', $request->input('category_id'));
         } 
-        else {
-            // Filter Sidebar Bawaan (Hanya jalan kalau BUKAN lagi milih kategori)
+        // 3. FILTER SIDEBAR (Hanya jalan kalau gak lagi search & gak pilih kategori)
+        // Kita kasih pengecualian: Kalau lagi Search, abaikan filter sidebar (Today/Upcoming) biar hasil search-nya luas.
+        else if (!$request->input('search')) { 
             switch ($request->input('filter')) {
                 case 'today':
                     $query->whereDate('due_date', Carbon::today());
@@ -31,23 +39,20 @@ class TaskController extends Controller
                 case 'archive':
                     $query->onlyTrashed();
                     break;
-                default:
-                    // Inbox (Semua yang belum dihapus) - Default behavior
-                    break;
             }
         }
 
         // Ambil Tugas
-        $tasks = $query->with('category')->orderBy('created_at', 'desc')->get(); // with('category') biar nama kategorinya kebawa
-
+        $tasks = $query->with('category')->orderBy('created_at', 'desc')->get();
         // Ambil Daftar Kategori milik User (Buat Sidebar & Dropdown)
         $categories = Category::where('user_id', auth()->id())->withCount('tasks')->get();
 
         return Inertia::render('Dashboard', [
             'tasks' => $tasks,
-            'categories' => $categories, // <--- KIRIM INI KE FRONTEND
+            'categories' => $categories,
             'currentFilter' => $request->input('filter', 'inbox'),
-            'currentCategoryId' => $request->input('category_id'), // Kirim ID kategori aktif (biar sidebar nyala)
+            'currentCategoryId' => $request->input('category_id'),
+            'searchTerm' => $request->input('search'), // <--- Kirim balik search term ke frontend
         ]);
     }
 

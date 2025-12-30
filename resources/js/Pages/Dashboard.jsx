@@ -13,10 +13,11 @@ import Swal from 'sweetalert2';
 import logoKelarin from '../../images/kelarinlogo.svg'; 
 
 // Props: categories dikasih default [] biar gak error layar putih
-export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'inbox', categories = [], currentCategoryId = null }) {
+export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'inbox', categories = [], currentCategoryId = null, searchTerm = '' }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
+    const [searchQuery, setSearchQuery] = useState(searchTerm || '');
     
     // Filter Lokal (Status)
     const [filterStatus, setFilterStatus] = useState('all');
@@ -60,11 +61,24 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
         }
     }, [flash]);
 
-    // Filter Lokal
-    const filteredTasks = tasks.filter(task => {
-        if (filterStatus === 'all') return true;
-        return task.status === filterStatus;
+    // --- LOGIKA FILTER GABUNGAN (CLIENT-SIDE INSTANT) ---
+    // Ini akan jalan setiap kali lu ngetik atau ganti dropdown status.
+    const finalFilteredTasks = tasks.filter(task => {
+        const statusMatch = filterStatus === 'all' || task.status === filterStatus;
+        const query = searchQuery.toLowerCase().trim();
+        const searchMatch = 
+            !query || 
+            task.title.toLowerCase().includes(query) || 
+            (task.description && task.description.toLowerCase().includes(query));
+        return statusMatch && searchMatch;
     });
+
+    const stats = {
+        total: finalFilteredTasks.length,
+        pending: finalFilteredTasks.filter(t => t.status === 'pending').length,
+        progress: finalFilteredTasks.filter(t => t.status === 'progress').length,
+        done: finalFilteredTasks.filter(t => t.status === 'done').length,
+    };
 
     // Buka Modal (Load Data)
     const openModal = (task = null) => {
@@ -85,6 +99,18 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
             reset();
         }
         setIsModalOpen(true);
+    };
+
+    const handleSearch = (e) => {
+        if (e.key === 'Enter') {
+            setFilterStatus('all');
+            router.get(route('dashboard'), { 
+                search: searchQuery, // Kirim kata kunci
+            }, { 
+                preserveState: true, // Biar gak kedip parah
+                replace: true 
+            });
+        }
     };
 
     const handleSubmit = (e) => {
@@ -145,13 +171,6 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
         done: { label: 'Done', badge: 'bg-emerald-100 text-emerald-700 border-emerald-300', card: 'bg-emerald-50' },
     };
 
-    const stats = {
-        total: tasks.length,
-        pending: tasks.filter(t => t.status === 'pending').length,
-        progress: tasks.filter(t => t.status === 'progress').length,
-        done: tasks.filter(t => t.status === 'done').length,
-    };
-
     return (
         <AuthenticatedLayout
             user={auth.user}
@@ -196,8 +215,22 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                             <h3 className="text-xl font-bold flex items-center gap-2">
                                 {currentFilter === 'archive' ? '🗑️ Sampah' : '📝 Daftar Tugas'}
                             </h3>
-                            
-                            <div className="flex gap-3 w-full md:w-auto">
+
+                            <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                                {/* --- SEARCH BAR (BARU) --- */}
+                                <div className="relative">
+                                        <TextInput 
+                                            type="text"
+                                            className="pl-9 w-full md:w-64 transition-all focus:w-full md:focus:w-72" // Kasih efek melebar dikit pas diklik biar keren
+                                            placeholder="Ketik untuk mencari..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            // onKeyDown dihapus aja, udah gak perlu
+                                        />
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                                </div>
+
+                                {/* Filter Status Lokal */}
                                 <select 
                                     className="rounded-lg border-gray-300 text-sm focus:ring-purple-500 focus:border-purple-500 cursor-pointer"
                                     value={filterStatus}
@@ -209,8 +242,9 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                                     <option value="done">✅ Done</option>
                                 </select>
 
+                                {/* Tombol Tambah */}
                                 {currentFilter !== 'archive' && (
-                                    <PrimaryButton onClick={() => openModal()} className="whitespace-nowrap">
+                                    <PrimaryButton onClick={() => openModal()} className="whitespace-nowrap flex justify-center">
                                         + Tambah Baru
                                     </PrimaryButton>
                                 )}
@@ -218,7 +252,7 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                         </div>
 
                         <div className="p-6">
-                            {filteredTasks.length === 0 ? (
+                            {finalFilteredTasks.length === 0 ? (
                                 <div className="text-center py-20">
                                     <p className="text-4xl mb-4">✨</p>
                                     <p className="text-gray-400 font-medium">
@@ -228,8 +262,11 @@ export default function Dashboard({ auth, tasks, flash = {}, currentFilter = 'in
                                     </p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {filteredTasks.map(task => (
+                                <div 
+                                    key={searchQuery} 
+                                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up 1s"
+                                >
+                                    {finalFilteredTasks.map(task => (
                                     <div
                                         key={task.id}
                                         className={`
