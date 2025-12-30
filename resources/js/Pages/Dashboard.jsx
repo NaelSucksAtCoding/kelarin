@@ -148,11 +148,19 @@ function KanbanColumn({ id, title, count, icon, bgInfo, children }) {
                 </div>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${bgInfo.badge}`}>{count}</span>
             </div>
+            
             <div ref={setNodeRef} className={`flex-1 p-3 border-x border-b rounded-b-xl bg-gray-50/50 dark:bg-gray-800/50 overflow-y-auto min-h-[400px] ${bgInfo.border}`}>
                 {children}
+                
+                {/* --- EMPTY STATE PREMIUM --- */}
                 {count === 0 && (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-600 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                        <p className="text-sm">Kosong</p>
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center opacity-70">
+                        {/* Ilustrasi SVG Simple (Ghost/Empty Box) */}
+                        <svg className="w-16 h-16 mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                        </svg>
+                        <p className="text-sm font-medium">Belum ada tugas</p>
+                        <p className="text-xs mt-1">Tarik napas, santai dulu ☕</p>
                     </div>
                 )}
             </div>

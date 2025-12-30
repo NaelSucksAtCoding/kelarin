@@ -169,7 +169,7 @@ export default function Authenticated({ user, header, children, categories = [],
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex transition-colors duration-300">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex transition-colors duration-300 ease-in-out">
             {/* ... SIDEBAR SAMA PERSIS ... */}
             <aside 
                 className={`

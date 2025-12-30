@@ -1,30 +1,53 @@
 import { Link } from '@inertiajs/react';
-import logoKelarin from '../../images/kelarinlogo.svg'; // Pastikan path logo bener
+import logoKelarin from '../../images/kelarinlogo.svg';
 
 export default function Guest({ children }) {
     return (
-        <div className="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-[#f3f4f6] relative overflow-hidden">
+        <div className="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 relative overflow-hidden">
             
-            {/* Hiasan Background (Blob Ungu Pudar) - Opsional biar estetik */}
-            <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
+            {/* 🎥 VIDEO BACKGROUND */}
+            <video 
+                autoPlay 
+                loop 
+                muted 
+                playsInline 
+                className="absolute inset-0 w-full h-full object-cover -z-20"
+            >
+                <source src="/videos/bg.mp4" type="video/mp4" />
+            </video>
+            
+            {/* Overlay Hitam (Biar video agak gelap dikit) */}
+            <div className="absolute inset-0 bg-black/40 -z-10"></div> 
 
-            {/* CONTAINER UTAMA (Card Putih) */}
-            <div className="w-full sm:max-w-md mt-6 px-10 py-12 bg-white shadow-[0_20px_60px_rgba(0,0,0,0.1)] rounded-[20px] relative z-10 transition-all duration-300 hover:shadow-[0_25px_70px_rgba(0,0,0,0.15)]">
-                
-                {/* HEADER LOGO */}
-                <div className="flex flex-col items-center mb-8">
+            {/* 💎 KONTEN UTAMA */}
+            <div className="relative z-10 w-full flex flex-col items-center">
+                <div className="mb-6 animate-fade-in-down">
                     <Link href="/">
-                        <img src={logoKelarin} alt="Logo" className="w-16 h-16 object-contain mb-4 hover:scale-110 transition-transform duration-300" />
+                        {/* Logo Putih */}
+                        <img src={logoKelarin} className="w-20 h-20 fill-current text-white drop-shadow-lg" alt="Logo" />
                     </Link>
-                    <h2 className="text-[#667eea] font-bold text-3xl mb-2">Kelarin.</h2>
-                    <p className="text-gray-500 text-sm text-center">
-                        Masuk untuk mulai produktif hari ini.
-                    </p>
                 </div>
 
-                {/* FORM (Login/Register masuk sini) */}
-                {children}
+                <div className="
+                    w-full sm:max-w-md mt-6 px-8 py-10 
+                    
+                    /* 🔥 UBAH DI SINI: JADI HITAM PEKAT (Gray-900) */
+                    bg-gray-900 
+                    
+                    /* Border gelap biar batasnya tegas */
+                    border border-gray-800
+                    
+                    /* Shadow tebal */
+                    shadow-2xl rounded-3xl 
+                    overflow-hidden
+                    transform transition-all hover:scale-[1.01] duration-500
+                ">
+                    {children}
+                </div>
+                
+                <div className="mt-8 text-white/80 text-xs font-bold tracking-wide drop-shadow-md">
+                    &copy; 2025 Kelarin App. Produktivitas Tanpa Batas.
+                </div>
             </div>
         </div>
     );
