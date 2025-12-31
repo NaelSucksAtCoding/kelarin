@@ -18,18 +18,19 @@ import { CSS } from '@dnd-kit/utilities';
 // --- LIBRARY CHART (ANALYTICS) ---
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-// --- CONFIG TOAST (UNDO ACTION) ---
+// --- CONFIG TOAST (FAST MODE ⚡) ---
 const Toast = Swal.mixin({
     toast: true,
-    position: 'bottom-end', // Muncul di pojok kanan bawah
-    showConfirmButton: true, // Tombol ini jadi "UNDO"
+    position: 'bottom-end',
+    showConfirmButton: true,
     confirmButtonText: '⏪ Undo',
-    confirmButtonColor: '#f59e0b', // Warna Amber/Orange biar beda
+    confirmButtonColor: '#f59e0b',
     showCancelButton: false,
-    timer: 3000, // Waktu 5 detik sebelum hilang
+    timer: 3000, // 3 Detik
     timerProgressBar: true,
     background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#fff',
     color: document.documentElement.classList.contains('dark') ? '#fff' : '#1f2937',
+    // didOpen dihapus biar timer strict (gak pause pas di-hover)
 });
 
 // --- KOMPONEN CUSTOM TOOLTIP ---
@@ -126,11 +127,10 @@ function TaskCard({ task, openModal, handleDelete, handleRestore, currentFilter,
     );
 }
 
-// --- 2. KOMPONEN KOLOM (UPDATED: CONTEXTUAL EMPTY STATE 🥉) ---
+// --- 2. KOMPONEN KOLOM ---
 function KanbanColumn({ id, title, count, icon, bgInfo, children, filter }) {
     const { setNodeRef } = useDroppable({ id });
 
-    // 🔥 LOGIC COPYWRITING "ASIK" 🥉
     const getEmptyMessage = () => {
         if (filter === 'archive') return { text: "Tong sampah bersih.", sub: "Gak ada yang dibuang." };
         if (id === 'pending') return { text: "Gak ada tugas gantung.", sub: "Santai dulu, bro! 😎" };
@@ -154,7 +154,6 @@ function KanbanColumn({ id, title, count, icon, bgInfo, children, filter }) {
                 {children}
                 {count === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center opacity-70">
-                        {/* SVG Ghost Icon */}
                         <svg className="w-16 h-16 mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                         </svg>
@@ -190,7 +189,6 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
 
     const handleDragStart = (event) => setActiveId(event.active.id);
 
-    // --- 🔥 LOGIC DRAG END (UPDATED: UNDO MOVE 🥈) ---
     const handleDragEnd = (event) => {
         const { active, over } = event;
         setActiveId(null);
@@ -199,29 +197,22 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
         const newStatus = over.id; 
         const oldTask = localTasks.find(t => t.id === taskId);
         
-        // Cek dulu, kalau statusnya gak berubah, ga usah ngapa2in
         if (!oldTask || oldTask.status === newStatus) return;
 
-        const previousStatus = oldTask.status; // Simpan status lama buat Undo
-
-        // 1. Optimistic Update (Visual)
+        const previousStatus = oldTask.status; 
         const updatedTasks = localTasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
         setLocalTasks(updatedTasks);
 
-        // 2. Request ke Backend + Toast Undo
         router.put(route('tasks.update', taskId), { ...oldTask, status: newStatus }, {
             preserveScroll: true, preserveState: true,
             onSuccess: () => {
+                Swal.close(); // 🔥 CLEAN UI: Tutup toast sebelumnya biar gak numpuk
                 Toast.fire({
                     icon: 'success',
                     title: `Pindah ke ${newStatus.toUpperCase()}`,
                 }).then((result) => {
-                    // --- 🔥 JIKA TOMBOL UNDO DITEKAN ---
                     if (result.isConfirmed) {
-                        // Balikin Visual
-                        setLocalTasks(localTasks); // Balik ke state awal sebelum drag
-                        
-                        // Balikin Backend
+                        setLocalTasks(localTasks);
                         router.put(route('tasks.update', taskId), { ...oldTask, status: previousStatus }, {
                             preserveScroll: true, preserveState: true,
                         });
@@ -283,7 +274,6 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
         isEditing ? put(route('tasks.update', editingId), options) : post(route('tasks.store'), options);
     };
 
-    // --- 🔥 FUNGSI DELETE (UPDATED: UNDO DELETE 🥈) ---
     const handleDelete = (id) => {
         const isArchive = currentFilter === 'archive';
         const isDark = document.documentElement.classList.contains('dark');
@@ -296,19 +286,17 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
             if (result.isConfirmed) {
                 router.delete(route('tasks.destroy', id), {
                     onSuccess: () => {
-                        // Jika Soft Delete (Buang ke Sampah), Kasih Undo
                         if (!isArchive) {
+                            Swal.close(); // 🔥 CLEAN UI: Tutup toast sebelumnya
                             Toast.fire({
                                 icon: 'warning',
                                 title: 'Tugas dibuang ke sampah.',
                             }).then((res) => {
                                 if (res.isConfirmed) {
-                                    // 🔥 UNDO DELETE (RESTORE)
                                     router.patch(route('tasks.restore', id));
                                 }
                             });
                         } else {
-                            // Kalau Hapus Permanen, ya udah ilang
                             Swal.fire({ title: 'Musnah!', text: 'Data sudah hilang selamanya.', icon: 'success', timer: 2000, showConfirmButton: false, background: isDark ? '#1f2937' : '#fff', color: isDark ? '#fff' : '#1f2937' });
                         }
                     }
@@ -370,7 +358,7 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
                         {currentFilter !== 'archive' && (<PrimaryButton onClick={() => openModal()} className="w-full md:w-auto justify-center">+ Tugas Baru</PrimaryButton>)}
                     </div>
 
-                    {/* KANBAN BOARD (PASS FILTER BUAT COPYWRITING) */}
+                    {/* KANBAN BOARD */}
                     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                         <div className="flex flex-col md:flex-row gap-6 items-start h-full">
                             <KanbanColumn id="pending" title="Pending" count={stats.pending} icon="⏳" bgInfo={COL_STYLES.pending} filter={currentFilter}>{columns.pending.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
@@ -382,7 +370,7 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
                 </div>
             </div>
 
-            {/* MODAL INPUT (SAMA) */}
+            {/* MODAL INPUT */}
             <Modal show={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <div className="p-6 dark:bg-gray-800 dark:text-white">
                     <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">{isEditing ? 'Edit Tugas' : 'Tambah Tugas Baru'}</h2>
