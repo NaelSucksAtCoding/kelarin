@@ -22,6 +22,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'preferences',
     ];
 
     /**
@@ -44,8 +45,20 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'preferences' => 'array',
         ];
     }
+
+    // 🔥 Default Settings (Pas user baru register)
+    protected $attributes = [
+    'preferences' => '{
+        "theme": "system",
+        "undo_duration": 3000,
+        "default_priority": "medium",
+        "default_view": "inbox"
+    }',
+    ];
+
     public function tasks()
     {
         return $this->hasMany(Task::class);

@@ -13,9 +13,20 @@ class TaskController extends Controller
 {
     public function index(Request $request)
     {
+        // 🔥 LOGIC REDIRECT: CEK DEFAULT VIEW USER
+        // Kalau gak ada request 'filter', 'category_id', atau 'search'
+        if (!$request->has('filter') && !$request->has('category_id') && !$request->has('search')) {
+            $defaultView = $request->user()->preferences['default_view'] ?? 'inbox';
+            
+            // Redirect jika user sukanya view lain (misal: Hari Ini)
+            if ($defaultView !== 'inbox') {
+                return redirect()->route('dashboard', ['filter' => $defaultView]);
+            }
+        }
+
         $query = Task::where('user_id', auth()->id());
 
-        // --- 1. FITUR SEARCH (BARU) ---
+        // --- 1. FITUR SEARCH ---
         if ($request->input('search')) {
             $query->where(function($q) use ($request) {
                 $q->where('title', 'like', '%' . $request->input('search') . '%')
@@ -27,8 +38,7 @@ class TaskController extends Controller
         if ($request->has('category_id')) {
             $query->where('category_id', $request->input('category_id'));
         } 
-        // 3. FILTER SIDEBAR (Hanya jalan kalau gak lagi search & gak pilih kategori)
-        // Kita kasih pengecualian: Kalau lagi Search, abaikan filter sidebar (Today/Upcoming) biar hasil search-nya luas.
+        // 3. FILTER SIDEBAR
         else if (!$request->input('search')) { 
             switch ($request->input('filter')) {
                 case 'today':
@@ -43,12 +53,7 @@ class TaskController extends Controller
             }
         }
 
-        // --- 4. SMART SORTING (BARU & CANGGIH!) ---
-        // Logic: 
-        // 1. Prioritas: High > Medium > Low
-        // 2. Deadline: Yang ada tanggalnya & mepet > Yang gak ada tanggal
-        // 3. Waktu Buat: Terbaru > Terlama
-        
+        // --- 4. SMART SORTING ---
         $query->orderByRaw("
             CASE priority 
                 WHEN 'high' THEN 1 
@@ -57,59 +62,50 @@ class TaskController extends Controller
                 ELSE 4 
             END
         ");
-        
-        // Sort by Due Date (NULLs last - biar tugas tanpa tanggal di bawah)
         $query->orderByRaw("CASE WHEN due_date IS NULL THEN 1 ELSE 0 END, due_date ASC");
-        
-        // Fallback: Created At
         $query->orderBy('created_at', 'desc');
 
-        // Ambil Tugas
-        $tasks = $query->with('category')->orderBy('created_at', 'desc')->get();
-        // Ambil Daftar Kategori milik User (Buat Sidebar & Dropdown)
-        $categories = Category::where('user_id', auth()->id())->withCount('tasks')->get();
-
-        // Ambil 7 hari terakhir
+        $tasks = $query->with('category')->get();
+        
+        // ❌ HAPUS $categories DARI SINI (Udah global di AppServiceProvider)
+        
+        // Statistik Mingguan
         $start = Carbon::now()->subDays(6);
         $end = Carbon::now();
         $period = CarbonPeriod::create($start, $end);
 
         $weeklyStats = collect($period)->map(function ($date) {
             return [
-                'day' => $date->format('D'), // Mon, Tue, Wed...
-                // Hitung tugas yang dibuat hari itu
+                'day' => $date->format('D'),
                 'added' => Task::where('user_id', auth()->id())
                             ->whereDate('created_at', $date)
                             ->count(),
-                // Hitung tugas yang statusnya DONE dan diupdate hari itu
                 'done' => Task::where('user_id', auth()->id())
                             ->where('status', 'done')
                             ->whereDate('updated_at', $date)
                             ->count(),
             ];
-        })->values(); // Reset keys biar jadi array bersih JSON
+        })->values();
 
         return Inertia::render('Dashboard', [
             'tasks' => $tasks,
-            'categories' => $categories,
+            // 'categories' => $categories, // ❌ JANGAN KIRIM INI LAGI
             'currentFilter' => $request->input('filter', 'inbox'),
             'currentCategoryId' => $request->input('category_id'),
-            'searchTerm' => $request->input('search'), // <--- Kirim balik search term ke frontend
-            'flash' => session('flash') ?? [], // Pastikan flash dikirim kalau belum
+            'searchTerm' => $request->input('search'),
+            'flash' => session('flash') ?? [],
             'weeklyStats' => $weeklyStats,
         ]);
     }
 
     public function store(Request $request)
     {
-        // --- PERBAIKAN DI SINI ---
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'status' => 'required|in:pending,progress,done',
             'due_date' => 'nullable|date',
             'priority' => 'required|in:high,medium,low',
-            // Kita izinkan category_id masuk, pastikan ID-nya ada di tabel categories
             'category_id' => 'nullable|exists:categories,id', 
         ]);
 
@@ -117,7 +113,7 @@ class TaskController extends Controller
 
         return to_route('dashboard')->with('success', 'Tugas baru berhasil dibuat! 🚀');
     }
-    // Method buat UPDATE data
+
     public function update(Request $request, Task $task)
     {
         if ($task->user_id !== auth()->id()) {
@@ -130,7 +126,7 @@ class TaskController extends Controller
             'status' => 'required|in:pending,progress,done',
             'due_date' => 'nullable|date',
             'priority' => 'required|in:high,medium,low',
-            'category_id' => 'nullable|exists:categories,id', // Tambahin ini
+            'category_id' => 'nullable|exists:categories,id',
         ]);
 
         $task->update($validated);
@@ -138,18 +134,14 @@ class TaskController extends Controller
         return to_route('dashboard')->with('success', 'Tugas berhasil diupdate! ✨');
     }
 
-    // Method buat DELETE data
     public function destroy($id)
     {
-        // Cari tugas (termasuk yang udah dihapus/soft deleted)
         $task = Task::withTrashed()->where('id', $id)->where('user_id', auth()->id())->firstOrFail();
 
         if ($task->trashed()) {
-            // Kalau udah di tong sampah, hapus permanen (Force Delete)
             $task->forceDelete();
             $message = 'Tugas dihapus selamanya (Permanen) 🔥';
         } else {
-            // Kalau masih aktif, masukin tong sampah (Soft Delete)
             $task->delete();
             $message = 'Tugas dipindahkan ke Arsip 🗑️';
         }
@@ -159,10 +151,7 @@ class TaskController extends Controller
 
     public function restore($id)
     {
-        // Cari tugas di tong sampah
         $task = Task::onlyTrashed()->where('id', $id)->where('user_id', auth()->id())->firstOrFail();
-        
-        // Balikin nyawanya
         $task->restore();
 
         return back()->with('success', 'Tugas berhasil dikembalikan! ♻️');

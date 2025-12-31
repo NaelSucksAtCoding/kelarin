@@ -1,0 +1,23 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Activity;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
+
+class ActivityController extends Controller
+{
+    public function index()
+    {
+        // 1. Ambil Aktivitas (Cukup ini aja)
+        $activities = Activity::where('user_id', Auth::id())
+            ->latest()
+            ->paginate(20);
+        // 2. Tampilkan ke halaman Inertia
+        return Inertia::render('Activity/Index', [
+            'activities' => $activities,
+        ]);
+    }
+}

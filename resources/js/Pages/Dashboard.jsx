@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, useForm, router, usePage } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
@@ -18,19 +18,18 @@ import { CSS } from '@dnd-kit/utilities';
 // --- LIBRARY CHART (ANALYTICS) ---
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-// --- CONFIG TOAST (FAST MODE ⚡) ---
-const Toast = Swal.mixin({
+// 🔥 REVISI: TOAST JADI FUNCTION DENGAN PARAMETER DURASI
+const createToast = (duration = 3000) => Swal.mixin({
     toast: true,
     position: 'bottom-end',
     showConfirmButton: true,
     confirmButtonText: '⏪ Undo',
     confirmButtonColor: '#f59e0b',
     showCancelButton: false,
-    timer: 3000, // 3 Detik
+    timer: duration, // 🔥 PAKAI DURASI DARI SETTING
     timerProgressBar: true,
     background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#fff',
     color: document.documentElement.classList.contains('dark') ? '#fff' : '#1f2937',
-    // didOpen dihapus biar timer strict (gak pause pas di-hover)
 });
 
 // --- KOMPONEN CUSTOM TOOLTIP ---
@@ -167,7 +166,18 @@ function KanbanColumn({ id, title, count, icon, bgInfo, children, filter }) {
 }
 
 // --- 3. DASHBOARD UTAMA ---
-export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, currentFilter = 'inbox', categories = [], currentCategoryId = null, searchTerm = '' }) {
+// Hapus props 'categories' dari sini karena udah global
+export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, currentFilter = 'inbox', currentCategoryId = null, searchTerm = '' }) {
+    
+    // 🔥 AMBIL KATEGORI DARI GLOBAL INERTIA
+    const { categories } = usePage().props;
+
+    // 🔥 AMBIL PREFERENSI USER (Safe Access)
+    const preferences = auth.user.preferences || { undo_duration: 3000, default_priority: 'medium' };
+    
+    // 🔥 INISIALISASI TOAST DENGAN DURASI USER
+    const Toast = createToast(preferences.undo_duration);
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -182,7 +192,12 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
     useEffect(() => { setLocalTasks(tasks); }, [tasks]);
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
-        title: '', description: '', status: 'pending', priority: 'medium', due_date: '', category_id: '',
+        title: '', 
+        description: '', 
+        status: 'pending', 
+        priority: preferences.default_priority, // 🔥 SETTING DEFAULT PRIORITY USER
+        due_date: '', 
+        category_id: currentCategoryId || '',
     });
 
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(TouchSensor));
@@ -206,7 +221,7 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
         router.put(route('tasks.update', taskId), { ...oldTask, status: newStatus }, {
             preserveScroll: true, preserveState: true,
             onSuccess: () => {
-                Swal.close(); // 🔥 CLEAN UI: Tutup toast sebelumnya biar gak numpuk
+                Swal.close(); // Clean previous toast
                 Toast.fire({
                     icon: 'success',
                     title: `Pindah ke ${newStatus.toUpperCase()}`,
@@ -258,7 +273,7 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
             });
         } else {
             setIsEditing(false); setEditingId(null); 
-            setData({ title: '', description: '', status: 'pending', priority: 'medium', due_date: '', category_id: currentCategoryId || '' });
+            setData({ title: '', description: '', status: 'pending', priority: preferences.default_priority, due_date: '', category_id: currentCategoryId || '' });
         }
         setIsModalOpen(true);
     };
@@ -287,7 +302,7 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
                 router.delete(route('tasks.destroy', id), {
                     onSuccess: () => {
                         if (!isArchive) {
-                            Swal.close(); // 🔥 CLEAN UI: Tutup toast sebelumnya
+                            Swal.close(); // Clean previous toast
                             Toast.fire({
                                 icon: 'warning',
                                 title: 'Tugas dibuang ke sampah.',

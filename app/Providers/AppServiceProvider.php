@@ -2,24 +2,34 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Gate;
+use App\Models\Task;
+use App\Observers\TaskObserver;
+use Inertia\Inertia;
+use App\Models\Category;
+use Illuminate\Support\Facades\Auth;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         //
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
-        Vite::prefetch(concurrency: 3);
+        Task::observe(TaskObserver::class);
+
+        // 🔥 LOGIC GLOBAL SIDEBAR (BEST PRACTICE)
+        // Data 'categories' bakal otomatis dikirim ke SEMUA halaman Inertia/React
+        Inertia::share('categories', function () {
+            if (!Auth::check()) {
+                return [];
+            }
+            return Category::where('user_id', Auth::id())
+                ->withCount('tasks')
+                ->get();
+        });
     }
 }
