@@ -18,18 +18,28 @@ import { CSS } from '@dnd-kit/utilities';
 // --- LIBRARY CHART (ANALYTICS) ---
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
+// --- CONFIG TOAST (UNDO ACTION) ---
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'bottom-end', // Muncul di pojok kanan bawah
+    showConfirmButton: true, // Tombol ini jadi "UNDO"
+    confirmButtonText: '⏪ Undo',
+    confirmButtonColor: '#f59e0b', // Warna Amber/Orange biar beda
+    showCancelButton: false,
+    timer: 3000, // Waktu 5 detik sebelum hilang
+    timerProgressBar: true,
+    background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#fff',
+    color: document.documentElement.classList.contains('dark') ? '#fff' : '#1f2937',
+});
+
 // --- KOMPONEN CUSTOM TOOLTIP ---
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
         return (
             <div className="bg-white dark:bg-gray-800 p-3 border dark:border-gray-700 rounded-lg shadow-xl text-left">
                 <p className="font-bold text-gray-700 dark:text-gray-200 mb-1 border-b dark:border-gray-600 pb-1">{label}</p>
-                <p className="text-xs text-purple-500 mt-1">
-                    📥 Masuk: <span className="font-bold text-sm">{payload[0].value}</span>
-                </p>
-                <p className="text-xs text-emerald-500">
-                    ✅ Selesai: <span className="font-bold text-sm">{payload[1].value}</span>
-                </p>
+                <p className="text-xs text-purple-500 mt-1">📥 Masuk: <span className="font-bold text-sm">{payload[0].value}</span></p>
+                <p className="text-xs text-emerald-500">✅ Selesai: <span className="font-bold text-sm">{payload[1].value}</span></p>
             </div>
         );
     }
@@ -85,7 +95,6 @@ function TaskCard({ task, openModal, handleDelete, handleRestore, currentFilter,
                         </span>
                     )}
                 </div>
-                
                 {!isOverlay && (
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm p-0.5 rounded-lg">
                         {currentFilter !== 'archive' ? (
@@ -102,7 +111,6 @@ function TaskCard({ task, openModal, handleDelete, handleRestore, currentFilter,
                     </div>
                 )}
             </div>
-            
             <div className="mb-2">
                 <h4 className="font-bold text-gray-800 dark:text-white text-sm leading-tight mb-1">{task.title}</h4>
                 {task.description && <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-2">{task.description}</p>}
@@ -118,9 +126,21 @@ function TaskCard({ task, openModal, handleDelete, handleRestore, currentFilter,
     );
 }
 
-// --- 2. KOMPONEN KOLOM ---
-function KanbanColumn({ id, title, count, icon, bgInfo, children }) {
+// --- 2. KOMPONEN KOLOM (UPDATED: CONTEXTUAL EMPTY STATE 🥉) ---
+function KanbanColumn({ id, title, count, icon, bgInfo, children, filter }) {
     const { setNodeRef } = useDroppable({ id });
+
+    // 🔥 LOGIC COPYWRITING "ASIK" 🥉
+    const getEmptyMessage = () => {
+        if (filter === 'archive') return { text: "Tong sampah bersih.", sub: "Gak ada yang dibuang." };
+        if (id === 'pending') return { text: "Gak ada tugas gantung.", sub: "Santai dulu, bro! 😎" };
+        if (id === 'progress') return { text: "Gak ada yang dikerjain?", sub: "Gas satu tugas dong! 🚀" };
+        if (id === 'done') return { text: "Belum ada yang kelar.", sub: "Yuk cicil dikit-dikit! 🔥" };
+        return { text: "Kosong melompong.", sub: "Sepi amat kayak hati." };
+    };
+
+    const msg = getEmptyMessage();
+
     return (
         <div className="flex flex-col h-full min-w-[280px] w-full md:w-1/3">
             <div className={`p-3 rounded-t-xl border-t border-x ${bgInfo.header} flex justify-between items-center`}>
@@ -134,11 +154,12 @@ function KanbanColumn({ id, title, count, icon, bgInfo, children }) {
                 {children}
                 {count === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center opacity-70">
+                        {/* SVG Ghost Icon */}
                         <svg className="w-16 h-16 mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                         </svg>
-                        <p className="text-sm font-medium">Belum ada tugas</p>
-                        <p className="text-xs mt-1">Tarik napas, santai dulu ☕</p>
+                        <p className="text-sm font-medium">{msg.text}</p>
+                        <p className="text-xs mt-1">{msg.sub}</p>
                     </div>
                 )}
             </div>
@@ -169,6 +190,7 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
 
     const handleDragStart = (event) => setActiveId(event.active.id);
 
+    // --- 🔥 LOGIC DRAG END (UPDATED: UNDO MOVE 🥈) ---
     const handleDragEnd = (event) => {
         const { active, over } = event;
         setActiveId(null);
@@ -176,13 +198,36 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
         const taskId = parseInt(active.id);
         const newStatus = over.id; 
         const oldTask = localTasks.find(t => t.id === taskId);
-        if (oldTask.status === newStatus) return;
+        
+        // Cek dulu, kalau statusnya gak berubah, ga usah ngapa2in
+        if (!oldTask || oldTask.status === newStatus) return;
 
+        const previousStatus = oldTask.status; // Simpan status lama buat Undo
+
+        // 1. Optimistic Update (Visual)
         const updatedTasks = localTasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
         setLocalTasks(updatedTasks);
 
+        // 2. Request ke Backend + Toast Undo
         router.put(route('tasks.update', taskId), { ...oldTask, status: newStatus }, {
             preserveScroll: true, preserveState: true,
+            onSuccess: () => {
+                Toast.fire({
+                    icon: 'success',
+                    title: `Pindah ke ${newStatus.toUpperCase()}`,
+                }).then((result) => {
+                    // --- 🔥 JIKA TOMBOL UNDO DITEKAN ---
+                    if (result.isConfirmed) {
+                        // Balikin Visual
+                        setLocalTasks(localTasks); // Balik ke state awal sebelum drag
+                        
+                        // Balikin Backend
+                        router.put(route('tasks.update', taskId), { ...oldTask, status: previousStatus }, {
+                            preserveScroll: true, preserveState: true,
+                        });
+                    }
+                });
+            },
             onError: () => { setLocalTasks(localTasks); Swal.fire('Gagal!', 'Gagal update status.', 'error'); }
         });
     };
@@ -218,23 +263,11 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
         if (task) {
             setIsEditing(true); setEditingId(task.id);
             setData({ 
-                title: task.title, 
-                description: task.description || '', 
-                status: task.status, 
-                priority: task.priority || 'medium', 
-                due_date: task.due_date ? task.due_date.split('T')[0] : '', 
-                category_id: task.category_id || '' 
+                title: task.title, description: task.description || '', status: task.status, priority: task.priority || 'medium', due_date: task.due_date ? task.due_date.split('T')[0] : '', category_id: task.category_id || '' 
             });
         } else {
             setIsEditing(false); setEditingId(null); 
-            setData({ 
-                title: '', 
-                description: '', 
-                status: 'pending', 
-                priority: 'medium', 
-                due_date: '', 
-                category_id: currentCategoryId || '' 
-            });
+            setData({ title: '', description: '', status: 'pending', priority: 'medium', due_date: '', category_id: currentCategoryId || '' });
         }
         setIsModalOpen(true);
     };
@@ -250,7 +283,7 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
         isEditing ? put(route('tasks.update', editingId), options) : post(route('tasks.store'), options);
     };
 
-    // --- 🔥 FUNGSI DELETE (REVISI: PAKE ONSUCCESS SWAL) ---
+    // --- 🔥 FUNGSI DELETE (UPDATED: UNDO DELETE 🥈) ---
     const handleDelete = (id) => {
         const isArchive = currentFilter === 'archive';
         const isDark = document.documentElement.classList.contains('dark');
@@ -258,63 +291,38 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
         Swal.fire({ 
             title: isArchive ? 'Hapus Permanen?' : 'Buang ke Sampah?', 
             text: isArchive ? "Data bakal hilang SELAMANYA gak bisa balik!" : "Tenang, masih bisa dibalikin dari menu Arsip.",
-            icon: isArchive ? 'error' : 'warning', 
-            showCancelButton: true, 
-            confirmButtonColor: '#d33', 
-            confirmButtonText: isArchive ? 'Ya, Musnahkan!' : 'Ya, Buang!', 
-            background: isDark ? '#1f2937' : '#fff', 
-            color: isDark ? '#fff' : '#1f2937' 
+            icon: isArchive ? 'error' : 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: isArchive ? 'Ya, Musnahkan!' : 'Ya, Buang!', background: isDark ? '#1f2937' : '#fff', color: isDark ? '#fff' : '#1f2937' 
         }).then((result) => {
             if (result.isConfirmed) {
-                // 🔥 TAMBAHIN ONSUCCESS CALLBACK DI SINI
                 router.delete(route('tasks.destroy', id), {
                     onSuccess: () => {
-                        Swal.fire({
-                            title: 'Berhasil!',
-                            text: isArchive ? 'Data sudah dimusnahkan.' : 'Tugas dibuang ke sampah.',
-                            icon: 'success',
-                            confirmButtonText: 'Oke',
-                            confirmButtonColor: '#9333ea',
-                            timer: 3000,
-                            timerProgressBar: true,
-                            background: isDark ? '#1f2937' : '#fff',
-                            color: isDark ? '#fff' : '#1f2937' 
-                        });
+                        // Jika Soft Delete (Buang ke Sampah), Kasih Undo
+                        if (!isArchive) {
+                            Toast.fire({
+                                icon: 'warning',
+                                title: 'Tugas dibuang ke sampah.',
+                            }).then((res) => {
+                                if (res.isConfirmed) {
+                                    // 🔥 UNDO DELETE (RESTORE)
+                                    router.patch(route('tasks.restore', id));
+                                }
+                            });
+                        } else {
+                            // Kalau Hapus Permanen, ya udah ilang
+                            Swal.fire({ title: 'Musnah!', text: 'Data sudah hilang selamanya.', icon: 'success', timer: 2000, showConfirmButton: false, background: isDark ? '#1f2937' : '#fff', color: isDark ? '#fff' : '#1f2937' });
+                        }
                     }
                 });
             }
         });
     };
 
-    // --- 🔥 FUNGSI RESTORE (REVISI: PAKE ONSUCCESS SWAL) ---
     const handleRestore = (id) => {
         const isDark = document.documentElement.classList.contains('dark');
-        
-        Swal.fire({ 
-            title: 'Balikin Tugas?', 
-            icon: 'question', 
-            showCancelButton: true, 
-            confirmButtonColor: '#10b981', 
-            confirmButtonText: 'Ya, Balikin!', 
-            background: isDark ? '#1f2937' : '#fff', 
-            color: isDark ? '#fff' : '#1f2937' 
-        }).then((result) => {
+        Swal.fire({ title: 'Balikin Tugas?', icon: 'question', showCancelButton: true, confirmButtonColor: '#10b981', confirmButtonText: 'Ya, Balikin!', background: isDark ? '#1f2937' : '#fff', color: isDark ? '#fff' : '#1f2937' }).then((result) => {
             if (result.isConfirmed) {
-                // 🔥 TAMBAHIN ONSUCCESS CALLBACK DI SINI
                 router.patch(route('tasks.restore', id), {}, {
-                    onSuccess: () => {
-                        Swal.fire({
-                            title: 'Berhasil!',
-                            text: 'Tugas aktif kembali!',
-                            icon: 'success',
-                            confirmButtonText: 'Mantap',
-                            confirmButtonColor: '#9333ea',
-                            timer: 3000,
-                            timerProgressBar: true,
-                            background: isDark ? '#1f2937' : '#fff',
-                            color: isDark ? '#fff' : '#1f2937' 
-                        });
-                    }
+                    onSuccess: () => { Swal.fire({ title: 'Berhasil!', text: 'Tugas aktif kembali!', icon: 'success', confirmButtonText: 'Mantap', confirmButtonColor: '#9333ea', timer: 3000, background: isDark ? '#1f2937' : '#fff', color: isDark ? '#fff' : '#1f2937' }); }
                 });
             }
         });
@@ -337,7 +345,6 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
 
             <div className="py-6 bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-                    
                     {/* STAT CARDS */}
                     <div className="flex flex-wrap gap-4 justify-center">
                         <div className="rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"><p className="text-[10px] font-bold uppercase text-gray-400">Total</p><p className="text-2xl font-black text-gray-700 dark:text-white">{stats.total}</p></div>
@@ -363,19 +370,19 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
                         {currentFilter !== 'archive' && (<PrimaryButton onClick={() => openModal()} className="w-full md:w-auto justify-center">+ Tugas Baru</PrimaryButton>)}
                     </div>
 
-                    {/* KANBAN BOARD */}
+                    {/* KANBAN BOARD (PASS FILTER BUAT COPYWRITING) */}
                     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                         <div className="flex flex-col md:flex-row gap-6 items-start h-full">
-                            <KanbanColumn id="pending" title="Pending" count={stats.pending} icon="⏳" bgInfo={COL_STYLES.pending}>{columns.pending.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
-                            <KanbanColumn id="progress" title="On Progress" count={stats.progress} icon="🔥" bgInfo={COL_STYLES.progress}>{columns.progress.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
-                            <KanbanColumn id="done" title="Selesai" count={stats.done} icon="✅" bgInfo={COL_STYLES.done}>{columns.done.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
+                            <KanbanColumn id="pending" title="Pending" count={stats.pending} icon="⏳" bgInfo={COL_STYLES.pending} filter={currentFilter}>{columns.pending.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
+                            <KanbanColumn id="progress" title="On Progress" count={stats.progress} icon="🔥" bgInfo={COL_STYLES.progress} filter={currentFilter}>{columns.progress.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
+                            <KanbanColumn id="done" title="Selesai" count={stats.done} icon="✅" bgInfo={COL_STYLES.done} filter={currentFilter}>{columns.done.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
                         </div>
                         <DragOverlay dropAnimation={dropAnimation}>{activeTask ? <TaskCard task={activeTask} isOverlay={true} currentFilter={currentFilter} /> : null}</DragOverlay>
                     </DndContext>
                 </div>
             </div>
 
-            {/* MODAL INPUT */}
+            {/* MODAL INPUT (SAMA) */}
             <Modal show={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <div className="p-6 dark:bg-gray-800 dark:text-white">
                     <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">{isEditing ? 'Edit Tugas' : 'Tambah Tugas Baru'}</h2>
@@ -387,12 +394,7 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
                         </div>
                         <div>
                             <InputLabel value="Kategori" className="dark:text-gray-300" />
-                            <select 
-                                className={`w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white mt-1 ${!isEditing && currentCategoryId ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`} 
-                                value={data.category_id} 
-                                onChange={e => setData('category_id', e.target.value)}
-                                disabled={!isEditing && !!currentCategoryId} 
-                            >
+                            <select className={`w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white mt-1 ${!isEditing && currentCategoryId ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''}`} value={data.category_id} onChange={e => setData('category_id', e.target.value)} disabled={!isEditing && !!currentCategoryId} >
                                 <option value="">📂 Inbox</option>
                                 {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                             </select>
