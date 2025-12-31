@@ -18,7 +18,7 @@ import { CSS } from '@dnd-kit/utilities';
 // --- LIBRARY CHART (ANALYTICS) ---
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-// 🔥 REVISI: TOAST JADI FUNCTION DENGAN PARAMETER DURASI
+// --- CONFIG TOAST ---
 const createToast = (duration = 3000) => Swal.mixin({
     toast: true,
     position: 'bottom-end',
@@ -26,7 +26,7 @@ const createToast = (duration = 3000) => Swal.mixin({
     confirmButtonText: '⏪ Undo',
     confirmButtonColor: '#f59e0b',
     showCancelButton: false,
-    timer: duration, // 🔥 PAKAI DURASI DARI SETTING
+    timer: duration,
     timerProgressBar: true,
     background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#fff',
     color: document.documentElement.classList.contains('dark') ? '#fff' : '#1f2937',
@@ -46,7 +46,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-// --- 1. KOMPONEN KARTU TUGAS ---
+// --- KOMPONEN KARTU TUGAS (KANBAN) ---
 function TaskCard({ task, openModal, handleDelete, handleRestore, currentFilter, isOverlay = false }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: task.id.toString(),
@@ -126,7 +126,7 @@ function TaskCard({ task, openModal, handleDelete, handleRestore, currentFilter,
     );
 }
 
-// --- 2. KOMPONEN KOLOM ---
+// --- KOMPONEN KOLOM KANBAN ---
 function KanbanColumn({ id, title, count, icon, bgInfo, children, filter }) {
     const { setNodeRef } = useDroppable({ id });
 
@@ -165,17 +165,105 @@ function KanbanColumn({ id, title, count, icon, bgInfo, children, filter }) {
     );
 }
 
+// 🔥 --- NEW FEATURE: FOCUS MODE VIEW --- 🔥
+// Tampilan checklist simpel khusus buat "Hari Ini"
+function FocusBoard({ tasks, toggleStatus, openModal }) {
+    // Pisahkan tugas Overdue & Today
+    const today = new Date().setHours(0,0,0,0);
+    
+    // Filter logic: Overdue jika tanggal < hari ini DAN status belum Done
+    const overdueTasks = tasks.filter(t => {
+        const d = new Date(t.due_date);
+        d.setHours(0,0,0,0);
+        return t.due_date && d < today && t.status !== 'done';
+    });
+
+    // Filter logic: Focus jika tanggal <= hari ini ATAU gak ada tanggal, tapi status belum Done
+    // (Note: Controller udah filter due_date <= today, jadi sisa filter status)
+    const focusTasks = tasks.filter(t => t.status !== 'done' && !overdueTasks.includes(t));
+    
+    const completedToday = tasks.filter(t => t.status === 'done');
+
+    const FocusItem = ({ task, isOverdue = false }) => (
+        <div className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 group ${isOverdue ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700 hover:shadow-md'}`}>
+            {/* CHECKBOX CUSTOM */}
+            <button 
+                onClick={() => toggleStatus(task)}
+                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${task.status === 'done' ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 dark:border-gray-500 hover:border-purple-500'}`}
+            >
+                {task.status === 'done' && <span className="text-white text-xs">✓</span>}
+            </button>
+
+            <div className="flex-1 cursor-pointer" onClick={() => openModal(task)}>
+                <div className="flex items-center gap-2 mb-1">
+                    <h4 className={`font-bold text-lg leading-tight ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-white'}`}>
+                        {task.title}
+                    </h4>
+                    {isOverdue && <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full uppercase">Telat!</span>}
+                    {task.priority === 'high' && <span className="text-xs">🔥</span>}
+                </div>
+                {task.description && <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{task.description}</p>}
+            </div>
+
+            <div className="text-right">
+                {task.category && <span className="block text-[10px] text-gray-400 uppercase tracking-wide">📂 {task.category.name}</span>}
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="max-w-3xl mx-auto space-y-8 pb-20">
+            {/* Header Focus Mode */}
+            <div className="text-center space-y-2">
+                <h2 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight">Fokus Hari Ini 🎯</h2>
+                <p className="text-gray-500 dark:text-gray-400">Selesaikan satu per satu. Jangan panik.</p>
+            </div>
+
+            {/* SECTION 1: OVERDUE (DARURAT) */}
+            {overdueTasks.length > 0 && (
+                <div className="space-y-3 animate-pulse-slow">
+                    <h3 className="text-sm font-bold text-red-500 uppercase tracking-wider pl-1">⚠️ Terlewat & Harus Dikelarin</h3>
+                    {overdueTasks.map(t => <FocusItem key={t.id} task={t} isOverdue={true} />)}
+                </div>
+            )}
+
+            {/* SECTION 2: FOCUS LIST */}
+            <div className="space-y-3">
+                {focusTasks.length > 0 ? (
+                    focusTasks.map(t => <FocusItem key={t.id} task={t} />)
+                ) : (
+                    overdueTasks.length === 0 && (
+                        <div className="text-center py-10 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl">
+                            <p className="text-4xl mb-2">🎉</p>
+                            <p className="text-gray-500 dark:text-gray-400 font-medium">Semua tugas hari ini beres!</p>
+                            <p className="text-sm text-gray-400">Rebahan dulu gih.</p>
+                        </div>
+                    )
+                )}
+            </div>
+
+            {/* SECTION 3: COMPLETED (DOPAMINE HIT) */}
+            {completedToday.length > 0 && (
+                <div className="opacity-60 hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
+                        <span className="text-xs font-bold text-gray-400 uppercase">Selesai Hari Ini ({completedToday.length})</span>
+                        <div className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></div>
+                    </div>
+                    <div className="space-y-2">
+                        {completedToday.map(t => <FocusItem key={t.id} task={t} />)}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // --- 3. DASHBOARD UTAMA ---
-// Hapus props 'categories' dari sini karena udah global
 export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, currentFilter = 'inbox', currentCategoryId = null, searchTerm = '' }) {
     
-    // 🔥 AMBIL KATEGORI DARI GLOBAL INERTIA
     const { categories } = usePage().props;
-
-    // 🔥 AMBIL PREFERENSI USER (Safe Access)
     const preferences = auth.user.preferences || { undo_duration: 3000, default_priority: 'medium' };
-    
-    // 🔥 INISIALISASI TOAST DENGAN DURASI USER
     const Toast = createToast(preferences.undo_duration);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -192,12 +280,7 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
     useEffect(() => { setLocalTasks(tasks); }, [tasks]);
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm({
-        title: '', 
-        description: '', 
-        status: 'pending', 
-        priority: preferences.default_priority, // 🔥 SETTING DEFAULT PRIORITY USER
-        due_date: '', 
-        category_id: currentCategoryId || '',
+        title: '', description: '', status: 'pending', priority: preferences.default_priority, due_date: '', category_id: currentCategoryId || '',
     });
 
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(TouchSensor));
@@ -210,8 +293,12 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
         if (!over) return;
         const taskId = parseInt(active.id);
         const newStatus = over.id; 
+        updateTaskStatus(taskId, newStatus);
+    };
+
+    // --- HELPER UPDATE STATUS (Bisa dipake DnD atau Click) ---
+    const updateTaskStatus = (taskId, newStatus) => {
         const oldTask = localTasks.find(t => t.id === taskId);
-        
         if (!oldTask || oldTask.status === newStatus) return;
 
         const previousStatus = oldTask.status; 
@@ -221,10 +308,10 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
         router.put(route('tasks.update', taskId), { ...oldTask, status: newStatus }, {
             preserveScroll: true, preserveState: true,
             onSuccess: () => {
-                Swal.close(); // Clean previous toast
+                Swal.close(); 
                 Toast.fire({
                     icon: 'success',
-                    title: `Pindah ke ${newStatus.toUpperCase()}`,
+                    title: newStatus === 'done' ? 'Tugas Selesai! 🎉' : `Pindah ke ${newStatus.toUpperCase()}`,
                 }).then((result) => {
                     if (result.isConfirmed) {
                         setLocalTasks(localTasks);
@@ -302,15 +389,8 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
                 router.delete(route('tasks.destroy', id), {
                     onSuccess: () => {
                         if (!isArchive) {
-                            Swal.close(); // Clean previous toast
-                            Toast.fire({
-                                icon: 'warning',
-                                title: 'Tugas dibuang ke sampah.',
-                            }).then((res) => {
-                                if (res.isConfirmed) {
-                                    router.patch(route('tasks.restore', id));
-                                }
-                            });
+                            Swal.close(); 
+                            Toast.fire({ icon: 'warning', title: 'Tugas dibuang ke sampah.', }).then((res) => { if (res.isConfirmed) router.patch(route('tasks.restore', id)); });
                         } else {
                             Swal.fire({ title: 'Musnah!', text: 'Data sudah hilang selamanya.', icon: 'success', timer: 2000, showConfirmButton: false, background: isDark ? '#1f2937' : '#fff', color: isDark ? '#fff' : '#1f2937' });
                         }
@@ -348,44 +428,58 @@ export default function Dashboard({ auth, tasks, weeklyStats = [], flash = {}, c
 
             <div className="py-6 bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-                    {/* STAT CARDS */}
-                    <div className="flex flex-wrap gap-4 justify-center">
-                        <div className="rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"><p className="text-[10px] font-bold uppercase text-gray-400">Total</p><p className="text-2xl font-black text-gray-700 dark:text-white">{stats.total}</p></div>
-                        <div className="rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 bg-orange-50 border-orange-100 dark:bg-gray-800 dark:border-gray-700"><p className="text-[10px] font-bold uppercase text-orange-600 dark:text-orange-400">Pending</p><p className="text-2xl font-black text-orange-700 dark:text-orange-300">{stats.pending}</p></div>
-                        <div className="rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 bg-blue-50 border-blue-100 dark:bg-gray-800 dark:border-gray-700"><p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400">Progress</p><p className="text-2xl font-black text-blue-700 dark:text-blue-300">{stats.progress}</p></div>
-                        <div className="rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 bg-emerald-50 border-emerald-100 dark:bg-gray-800 dark:border-gray-700"><p className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">Done</p><p className="text-2xl font-black text-emerald-700 dark:text-emerald-300">{stats.done}</p></div>
-                    </div>
-
-                    {/* CHART ANALYTICS */}
-                    {!currentFilter.includes('archive') && !currentCategoryId && (
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl border dark:border-gray-700 p-6 shadow-sm transition-colors">
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
-                                <div><h3 className="font-bold text-gray-700 dark:text-white flex items-center gap-2 text-lg">📊 Produktivitas Minggu Ini</h3><p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Minggu ini kamu menyelesaikan <span className="font-bold text-emerald-500">{totalDone}</span> dari <span className="font-bold text-purple-500">{totalAdded}</span> tugas baru.</p></div>
-                                {bestDay.done > 0 && (<div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 rounded-lg border border-emerald-100 dark:border-emerald-800"><span className="text-xl">🔥</span><div><p className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">Paling Produktif</p><p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{bestDay.day} ({bestDay.done} Selesai)</p></div></div>)}
+                    
+                    {/* 🔥 CONDITIONAL RENDERING: KANBAN vs FOCUS MODE */}
+                    {currentFilter === 'today' ? (
+                        /* --- TAMPILAN FOKUS HARI INI (CHECKLIST MODE) --- */
+                        <FocusBoard 
+                            tasks={localTasks} 
+                            toggleStatus={(task) => updateTaskStatus(task.id, task.status === 'done' ? 'pending' : 'done')}
+                            openModal={openModal}
+                        />
+                    ) : (
+                        /* --- TAMPILAN DEFAULT (KANBAN BOARD) --- */
+                        <>
+                            {/* STAT CARDS */}
+                            <div className="flex flex-wrap gap-4 justify-center">
+                                <div className="rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700"><p className="text-[10px] font-bold uppercase text-gray-400">Total</p><p className="text-2xl font-black text-gray-700 dark:text-white">{stats.total}</p></div>
+                                <div className="rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 bg-orange-50 border-orange-100 dark:bg-gray-800 dark:border-gray-700"><p className="text-[10px] font-bold uppercase text-orange-600 dark:text-orange-400">Pending</p><p className="text-2xl font-black text-orange-700 dark:text-orange-300">{stats.pending}</p></div>
+                                <div className="rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 bg-blue-50 border-blue-100 dark:bg-gray-800 dark:border-gray-700"><p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400">Progress</p><p className="text-2xl font-black text-blue-700 dark:text-blue-300">{stats.progress}</p></div>
+                                <div className="rounded-xl p-3 border shadow-sm flex flex-col items-center justify-center w-28 bg-emerald-50 border-emerald-100 dark:bg-gray-800 dark:border-gray-700"><p className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">Done</p><p className="text-2xl font-black text-emerald-700 dark:text-emerald-300">{stats.done}</p></div>
                             </div>
-                            <div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={weeklyStats} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:opacity-10" /><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12 }} dy={10} /><YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12 }} /><Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} /><Bar dataKey="added" name="Ditambah" fill="#a855f7" radius={[4, 4, 0, 0]} barSize={20} /><Bar dataKey="done" name="Selesai" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} /></BarChart></ResponsiveContainer></div>
-                        </div>
+
+                            {/* CHART ANALYTICS */}
+                            {!currentFilter.includes('archive') && !currentCategoryId && (
+                                <div className="bg-white dark:bg-gray-800 rounded-2xl border dark:border-gray-700 p-6 shadow-sm transition-colors">
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
+                                        <div><h3 className="font-bold text-gray-700 dark:text-white flex items-center gap-2 text-lg">📊 Produktivitas Minggu Ini</h3><p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Minggu ini kamu menyelesaikan <span className="font-bold text-emerald-500">{totalDone}</span> dari <span className="font-bold text-purple-500">{totalAdded}</span> tugas baru.</p></div>
+                                        {bestDay.done > 0 && (<div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 rounded-lg border border-emerald-100 dark:border-emerald-800"><span className="text-xl">🔥</span><div><p className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">Paling Produktif</p><p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{bestDay.day} ({bestDay.done} Selesai)</p></div></div>)}
+                                    </div>
+                                    <div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={weeklyStats} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:opacity-10" /><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12 }} dy={10} /><YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12 }} /><Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} /><Bar dataKey="added" name="Ditambah" fill="#a855f7" radius={[4, 4, 0, 0]} barSize={20} /><Bar dataKey="done" name="Selesai" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} /></BarChart></ResponsiveContainer></div>
+                                </div>
+                            )}
+
+                            {/* TOOLBAR */}
+                            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-gray-800 p-4 rounded-2xl border dark:border-gray-700 shadow-sm transition-colors">
+                                <div className="relative w-full md:w-auto"><TextInput type="text" className="pl-9 w-full md:w-72 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400" placeholder="Cari tugas..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span></div>
+                                {currentFilter !== 'archive' && (<PrimaryButton onClick={() => openModal()} className="w-full md:w-auto justify-center">+ Tugas Baru</PrimaryButton>)}
+                            </div>
+
+                            {/* KANBAN BOARD */}
+                            <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                                <div className="flex flex-col md:flex-row gap-6 items-start h-full">
+                                    <KanbanColumn id="pending" title="Pending" count={stats.pending} icon="⏳" bgInfo={COL_STYLES.pending} filter={currentFilter}>{columns.pending.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
+                                    <KanbanColumn id="progress" title="On Progress" count={stats.progress} icon="🔥" bgInfo={COL_STYLES.progress} filter={currentFilter}>{columns.progress.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
+                                    <KanbanColumn id="done" title="Selesai" count={stats.done} icon="✅" bgInfo={COL_STYLES.done} filter={currentFilter}>{columns.done.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
+                                </div>
+                                <DragOverlay dropAnimation={dropAnimation}>{activeTask ? <TaskCard task={activeTask} isOverlay={true} currentFilter={currentFilter} /> : null}</DragOverlay>
+                            </DndContext>
+                        </>
                     )}
-
-                    {/* TOOLBAR */}
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-gray-800 p-4 rounded-2xl border dark:border-gray-700 shadow-sm transition-colors">
-                        <div className="relative w-full md:w-auto"><TextInput type="text" className="pl-9 w-full md:w-72 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400" placeholder="Cari tugas..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span></div>
-                        {currentFilter !== 'archive' && (<PrimaryButton onClick={() => openModal()} className="w-full md:w-auto justify-center">+ Tugas Baru</PrimaryButton>)}
-                    </div>
-
-                    {/* KANBAN BOARD */}
-                    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                        <div className="flex flex-col md:flex-row gap-6 items-start h-full">
-                            <KanbanColumn id="pending" title="Pending" count={stats.pending} icon="⏳" bgInfo={COL_STYLES.pending} filter={currentFilter}>{columns.pending.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
-                            <KanbanColumn id="progress" title="On Progress" count={stats.progress} icon="🔥" bgInfo={COL_STYLES.progress} filter={currentFilter}>{columns.progress.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
-                            <KanbanColumn id="done" title="Selesai" count={stats.done} icon="✅" bgInfo={COL_STYLES.done} filter={currentFilter}>{columns.done.map(task => <TaskCard key={task.id} task={task} openModal={openModal} handleDelete={handleDelete} handleRestore={handleRestore} currentFilter={currentFilter} />)}</KanbanColumn>
-                        </div>
-                        <DragOverlay dropAnimation={dropAnimation}>{activeTask ? <TaskCard task={activeTask} isOverlay={true} currentFilter={currentFilter} /> : null}</DragOverlay>
-                    </DndContext>
                 </div>
             </div>
 
-            {/* MODAL INPUT */}
+            {/* MODAL INPUT (Sama) */}
             <Modal show={isModalOpen} onClose={() => setIsModalOpen(false)}>
                 <div className="p-6 dark:bg-gray-800 dark:text-white">
                     <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">{isEditing ? 'Edit Tugas' : 'Tambah Tugas Baru'}</h2>

@@ -42,7 +42,7 @@ class TaskController extends Controller
         else if (!$request->input('search')) { 
             switch ($request->input('filter')) {
                 case 'today':
-                    $query->whereDate('due_date', Carbon::today());
+                    $query->whereDate('due_date', '<=', Carbon::today());
                     break;
                 case 'upcoming':
                     $query->whereDate('due_date', '>', Carbon::today());
