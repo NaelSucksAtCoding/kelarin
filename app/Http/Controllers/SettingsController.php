@@ -27,9 +27,11 @@ class SettingsController extends Controller
         // Validasi input
         $validated = $request->validate([
             'theme' => 'required|string|in:light,dark,system',
-            'undo_duration' => 'required|integer|in:3000,5000,10000', // 3s, 5s, 10s
+            'undo_duration' => 'required|integer|in:3000,5000,10000',
             'default_priority' => 'required|string|in:low,medium,high',
             'default_view' => 'required|string|in:inbox,today,upcoming',
+            // 🔥 SETTING BARU: ALARM REPETITION
+            'alarm_repetition' => 'required|integer|in:1,2,3,5', 
         ]);
 
         // Simpan ke kolom JSON 'preferences'

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Activity;
+use App\Models\Task;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
@@ -19,5 +20,21 @@ class ActivityController extends Controller
         return Inertia::render('Activity/Index', [
             'activities' => $activities,
         ]);
+    }
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'description' => 'required|string',
+            'type' => 'required|string', // success, info, dll
+        ]);
+
+        Activity::create([
+            'user_id' => Auth::id(),
+            'description' => $request->description,
+            'type' => $request->type,
+        ]);
+
+        return back(); // Gak perlu return apa-apa, 200 OK cukup
     }
 }

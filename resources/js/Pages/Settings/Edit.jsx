@@ -13,6 +13,7 @@ export default function SettingsEdit({ auth, preferences, status }) {
         undo_duration: preferences.undo_duration || 3000,
         default_priority: preferences.default_priority || 'medium',
         default_view: preferences.default_view || 'inbox',
+        alarm_repetition: preferences.alarm_repetition || 1,
     });
 
     const submit = (e) => {
@@ -128,6 +129,22 @@ export default function SettingsEdit({ auth, preferences, status }) {
                                     <option value="today">☀️ Hari Ini</option>
                                     <option value="upcoming">🗓️ Mendatang</option>
                                 </select>
+                            </div>
+
+                            {/* 5. ALARM REPETITION (BARU) */}
+                            <div>
+                                <InputLabel value="Bunyi Alarm Pomodoro" className="dark:text-gray-300 mb-2" />
+                                <select 
+                                    value={data.alarm_repetition} 
+                                    onChange={(e) => setData('alarm_repetition', parseInt(e.target.value))}
+                                    className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                >
+                                    <option value="1">🔔 Sekali (Ting!)</option>
+                                    <option value="2">🔔🔔 Dua Kali (Ting! Ting!)</option>
+                                    <option value="3">🔔🔔🔔 Tiga Kali (Agak Berisik)</option>
+                                    <option value="5">📢 Lima Kali (Wajib Bangun!)</option>
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">Berapa kali bunyi alarm diputar saat waktu habis.</p>
                             </div>
 
                             <div className="flex justify-end pt-4">

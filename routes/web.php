@@ -47,6 +47,7 @@ Route::middleware('auth', 'verified')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::post('/activities', [ActivityController::class, 'store'])->name('activities.store');
 });
 
 require __DIR__.'/auth.php';

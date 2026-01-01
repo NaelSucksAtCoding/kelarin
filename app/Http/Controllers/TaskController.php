@@ -14,11 +14,8 @@ class TaskController extends Controller
     public function index(Request $request)
     {
         // 🔥 LOGIC REDIRECT: CEK DEFAULT VIEW USER
-        // Kalau gak ada request 'filter', 'category_id', atau 'search'
         if (!$request->has('filter') && !$request->has('category_id') && !$request->has('search')) {
             $defaultView = $request->user()->preferences['default_view'] ?? 'inbox';
-            
-            // Redirect jika user sukanya view lain (misal: Hari Ini)
             if ($defaultView !== 'inbox') {
                 return redirect()->route('dashboard', ['filter' => $defaultView]);
             }
@@ -42,7 +39,7 @@ class TaskController extends Controller
         else if (!$request->input('search')) { 
             switch ($request->input('filter')) {
                 case 'today':
-                    $query->whereDate('due_date', '<=', Carbon::today());
+                    $query->whereDate('due_date', '<=', Carbon::today()); // Include Overdue
                     break;
                 case 'upcoming':
                     $query->whereDate('due_date', '>', Carbon::today());
@@ -54,20 +51,11 @@ class TaskController extends Controller
         }
 
         // --- 4. SMART SORTING ---
-        $query->orderByRaw("
-            CASE priority 
-                WHEN 'high' THEN 1 
-                WHEN 'medium' THEN 2 
-                WHEN 'low' THEN 3 
-                ELSE 4 
-            END
-        ");
+        $query->orderByRaw("CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END");
         $query->orderByRaw("CASE WHEN due_date IS NULL THEN 1 ELSE 0 END, due_date ASC");
         $query->orderBy('created_at', 'desc');
 
         $tasks = $query->with('category')->get();
-        
-        // ❌ HAPUS $categories DARI SINI (Udah global di AppServiceProvider)
         
         // Statistik Mingguan
         $start = Carbon::now()->subDays(6);
@@ -77,19 +65,13 @@ class TaskController extends Controller
         $weeklyStats = collect($period)->map(function ($date) {
             return [
                 'day' => $date->format('D'),
-                'added' => Task::where('user_id', auth()->id())
-                            ->whereDate('created_at', $date)
-                            ->count(),
-                'done' => Task::where('user_id', auth()->id())
-                            ->where('status', 'done')
-                            ->whereDate('updated_at', $date)
-                            ->count(),
+                'added' => Task::where('user_id', auth()->id())->whereDate('created_at', $date)->count(),
+                'done' => Task::where('user_id', auth()->id())->where('status', 'done')->whereDate('updated_at', $date)->count(),
             ];
         })->values();
 
         return Inertia::render('Dashboard', [
             'tasks' => $tasks,
-            // 'categories' => $categories, // ❌ JANGAN KIRIM INI LAGI
             'currentFilter' => $request->input('filter', 'inbox'),
             'currentCategoryId' => $request->input('category_id'),
             'searchTerm' => $request->input('search'),
@@ -111,7 +93,8 @@ class TaskController extends Controller
 
         $request->user()->tasks()->create($validated);
 
-        return to_route('dashboard')->with('success', 'Tugas baru berhasil dibuat! 🚀');
+        // 🔥 UBAH KE BACK() BIAR GAK LEMPAR KE INBOX
+        return back()->with('success', 'Tugas baru berhasil dibuat! 🚀');
     }
 
     public function update(Request $request, Task $task)
@@ -131,7 +114,8 @@ class TaskController extends Controller
 
         $task->update($validated);
 
-        return to_route('dashboard')->with('success', 'Tugas berhasil diupdate! ✨');
+        // 🔥 UBAH KE BACK() BIAR USER TETEP DI FILTER YANG SAMA
+        return back()->with('success', 'Tugas berhasil diupdate! ✨');
     }
 
     public function destroy($id)

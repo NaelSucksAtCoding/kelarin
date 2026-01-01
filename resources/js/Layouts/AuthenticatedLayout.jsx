@@ -7,11 +7,11 @@ import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
 import SecondaryButton from '@/Components/SecondaryButton';
 import PrimaryButton from '@/Components/PrimaryButton';
+import PomodoroTimer from '@/Components/PomodoroTimer';
 import Swal from 'sweetalert2'; 
 import logoKelarin from '../../images/kelarinlogo.svg'; 
 
-export default function Authenticated({ user, header, children, categories = [], currentCategoryId = null }) {
-    const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
+export default function Authenticated({ user, header, children, categories = [], currentCategoryId = null }) {    const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const { url } = usePage();
     const [showUserMenu, setShowUserMenu] = useState(false);
@@ -137,8 +137,12 @@ export default function Authenticated({ user, header, children, categories = [],
             
             <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
                 {header && (<header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors duration-300"><div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">{header}</div></header>)}
-                <main className="flex-1">{children}</main>
+                <main className="flex-1 pb-20"> {/* 🔥 Kasih padding bottom biar konten gak ketutup Timer */}
+                    {children}
+                </main>
             </div>
+            {/* 🔥 PASANG TIMER DI SINI (GLOBAL) */}
+            <PomodoroTimer /> 
         </div>
     );
 }
