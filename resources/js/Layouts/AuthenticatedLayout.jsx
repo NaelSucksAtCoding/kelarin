@@ -8,11 +8,11 @@ import TextInput from '@/Components/TextInput';
 import SecondaryButton from '@/Components/SecondaryButton';
 import PrimaryButton from '@/Components/PrimaryButton';
 import PomodoroTimer from '@/Components/PomodoroTimer';
+import ReminderManager from '@/Components/ReminderManager'
 import Swal from 'sweetalert2'; 
 import logoKelarin from '../../images/kelarinlogo.svg'; 
 
-export default function Authenticated({ user, header, children, categories = [], currentCategoryId = null }) {
-    const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
+export default function Authenticated({ user, header, children, categories = [], currentCategoryId = null }) {    const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const { url } = usePage();
     const [showUserMenu, setShowUserMenu] = useState(false);
@@ -159,6 +159,7 @@ export default function Authenticated({ user, header, children, categories = [],
                 </main>
             </div>
             <PomodoroTimer /> 
+            <ReminderManager />
         </div>
     );
 }
