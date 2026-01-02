@@ -2,6 +2,7 @@
 
 namespace App\Models;
 use App\Models\Task;
+use App\Models\Activity;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -62,5 +63,10 @@ class User extends Authenticatable
     public function tasks()
     {
         return $this->hasMany(Task::class);
+    }
+
+    public function activities()
+    {
+        return $this->hasMany(Activity::class);
     }
 }

@@ -6,15 +6,15 @@ export default function PomodoroTimer() {
     const [session, setSession] = useState(null); 
     const [now, setNow] = useState(Date.now());
     const sessionRef = useRef(session);
-    const audioRef = useRef(null);
+    const audioRef = useRef(null); // Ref buat Musik Background
     
-    // Config Alarm
+    // Config Alarm dari User Preferences
     const { auth } = usePage().props;
     const repetition = auth.user.preferences?.alarm_repetition || 1;
 
     useEffect(() => { sessionRef.current = session; }, [session]);
 
-    // Emit Status
+    // Emit Status ke Dashboard (Biar tombol tomat ilang)
     useEffect(() => {
         if (session) {
             window.dispatchEvent(new CustomEvent('pomodoro-status', { detail: { taskId: session.taskId, status: session.status } }));
@@ -23,7 +23,7 @@ export default function PomodoroTimer() {
         }
     }, [session]);
 
-    // Audio Logic
+    // 🔥 AUDIO BACKGROUND LOGIC (LOFI)
     useEffect(() => {
         if (!session || !session.music || session.music !== 'lofi') {
             if (audioRef.current) { audioRef.current.pause(); }
@@ -42,7 +42,7 @@ export default function PomodoroTimer() {
             
             var playPromise = audioRef.current.play();
             if (playPromise !== undefined) {
-                playPromise.catch(error => console.log("Audio autoplay blocked"));
+                playPromise.catch(error => console.log("Audio autoplay blocked by browser"));
             }
         } else {
             if (audioRef.current) audioRef.current.pause();
@@ -56,16 +56,23 @@ export default function PomodoroTimer() {
         };
     }, [session?.status, session?.music]);
 
-    // Alarm Logic
+    // 🔥 ALARM LOGIC (REKURSIF)
     const playAlarm = (count) => {
         if (count <= 0) return;
-        const audio = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c153dd.mp3?filename=service-bell-ring-14610.mp3'); 
-        audio.volume = 0.7;
-        audio.play().catch(e => console.log("Audio blocked", e));
-        setTimeout(() => { playAlarm(count - 1); }, 1500);
+        
+        // Sound Beep Pendek & Jelas
+        const alarmAudio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'); 
+        alarmAudio.volume = 1.0; 
+        
+        alarmAudio.play().catch(e => console.error("Alarm error:", e));
+        
+        // Loop bunyi selanjutnya
+        setTimeout(() => { 
+            playAlarm(count - 1); 
+        }, 1200); // Jeda 1.2 detik antar beep
     };
 
-    // Load State
+    // Load State dari LocalStorage
     useEffect(() => {
         const saved = localStorage.getItem('kelarin_pomodoro');
         if (saved) {
@@ -144,13 +151,37 @@ export default function PomodoroTimer() {
         }).then((res) => { if (res.isConfirmed) { if(audioRef.current) audioRef.current.pause(); setSession(null); } });
     };
 
+    // 🔥 LOGIC SELESAI SESI (ALARM + SIMPAN DATA)
     const completeSession = () => {
+        // 1. Bunyikan Alarm
         playAlarm(repetition);
+        
+        // 2. Stop Musik Background
         if(audioRef.current) audioRef.current.pause();
+        
+        // 3. Simpan ke Database via Controller
         const minutesCompleted = Math.round(session.duration / 60000);
-        router.post(route('activities.store'), { description: `Menyelesaikan sesi fokus ${minutesCompleted} menit: '${session.title}'`, type: 'success' }, { preserveScroll: true });
+        
+        router.post(route('activities.store'), {
+            description: `Menyelesaikan sesi fokus ${minutesCompleted} menit: '${session.title}'`,
+            type: 'success',
+            duration_minutes: minutesCompleted, // Data buat Analytics
+            task_id: session.taskId // Relasi Task buat Analytics
+        }, { preserveScroll: true });
+
+        // 4. Notifikasi Visual
         const isDark = document.documentElement.classList.contains('dark');
-        Swal.fire({ title: 'Fokus Selesai! 🎉', text: 'Mantap! Istirahat bentar.', icon: 'success', confirmButtonText: 'Sip!', confirmButtonColor: '#9333ea', background: isDark ? '#1f2937' : '#fff', color: isDark ? '#fff' : '#1f2937' });
+        Swal.fire({ 
+            title: 'Fokus Selesai! 🎉', 
+            text: 'Mantap! Istirahat bentar.', 
+            icon: 'success', 
+            confirmButtonText: 'Sip!', 
+            confirmButtonColor: '#9333ea', 
+            background: isDark ? '#1f2937' : '#fff', 
+            color: isDark ? '#fff' : '#1f2937' 
+        });
+        
+        // 5. Reset Timer
         setSession(null);
     };
 
@@ -206,7 +237,7 @@ export default function PomodoroTimer() {
                 {session.theme === 'cat' && session.status === 'running' && (
                     <div 
                         className="absolute top-[-22px] transition-all duration-1000 ease-linear z-20 filter drop-shadow-sm"
-                        // 🔥 FIX FINAL: MUNDURIN 38px BIAR MUKA KUCING PAS DI UJUNG GARIS
+                        // 🔥 FINAL OFFSET KUCING: -60px sesuai request
                         style={{ left: `calc(${progressPercent}% - 60px)` }} 
                     >
                         <span className="text-2xl inline-block" style={{ transform: 'scaleX(-1)' }}>

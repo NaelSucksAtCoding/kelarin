@@ -5,6 +5,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\CategoryController; 
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\AnalyticsController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -43,6 +44,7 @@ Route::resource('categories', CategoryController::class)->only(['store', 'update
 Route::middleware('auth', 'verified')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
+    Route::get('/analytics/focus', [AnalyticsController::class, 'focus'])->name('analytics.focus');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');

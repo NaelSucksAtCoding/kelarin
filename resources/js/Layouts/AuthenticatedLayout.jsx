@@ -11,13 +11,13 @@ import PomodoroTimer from '@/Components/PomodoroTimer';
 import Swal from 'sweetalert2'; 
 import logoKelarin from '../../images/kelarinlogo.svg'; 
 
-export default function Authenticated({ user, header, children, categories = [], currentCategoryId = null }) {    const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
+export default function Authenticated({ user, header, children, categories = [], currentCategoryId = null }) {
+    const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const { url } = usePage();
     const [showUserMenu, setShowUserMenu] = useState(false);
     
     // --- 🔥 LOGIC TEMA (AUTO SINKRON DATABASE) ---
-    // Kita gak butuh state 'darkMode' lokal lagi, langsung baca dari props user
     useEffect(() => {
         const userTheme = user.preferences?.theme || 'system';
         
@@ -29,7 +29,6 @@ export default function Authenticated({ user, header, children, categories = [],
                 document.documentElement.classList.remove('dark');
                 localStorage.setItem('theme', 'light');
             } else {
-                // System Mode
                 localStorage.removeItem('theme');
                 if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     document.documentElement.classList.add('dark');
@@ -40,7 +39,7 @@ export default function Authenticated({ user, header, children, categories = [],
         };
 
         applyTheme(userTheme);
-    }, [user.preferences?.theme]); // Re-run otomatis kalau user ubah setting di halaman Settings
+    }, [user.preferences?.theme]); 
 
     // STATE KHUSUS EDIT
     const [editingCategory, setEditingCategory] = useState(null);
@@ -69,14 +68,31 @@ export default function Authenticated({ user, header, children, categories = [],
     };
 
     const SidebarLink = ({ href, active, icon, label, badge = null, onDelete = null, onEdit = null }) => (
-        <Link href={href} title={!isSidebarOpen ? label : ''} className={`group flex items-center py-3 mb-1 font-medium rounded-xl transition-all duration-200 relative ${isSidebarOpen ? 'px-4 justify-between' : 'justify-center px-2'} ${active ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-900/20 dark:text-purple-300' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'}`}>
-            <div className={`flex items-center ${isSidebarOpen ? 'gap-3' : ''}`}>
-                <span className={`${isSidebarOpen ? 'text-lg' : 'text-xl'}`}>{icon}</span>
-                <span className={`transition-all duration-300 truncate max-w-[100px] ${isSidebarOpen ? 'opacity-100 block' : 'opacity-0 hidden w-0'}`}>{label}</span>
-            </div>
-            {isSidebarOpen && (<div className="flex items-center gap-1">{badge > 0 && (<span className={`text-[10px] py-0.5 px-2 rounded-full font-bold transition-opacity ${active ? 'bg-purple-200 text-purple-700 dark:bg-purple-800 dark:text-purple-200' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'} group-hover:hidden`}>{badge}</span>)}{(onEdit || onDelete) && (<div className="hidden group-hover:flex items-center bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-md">{onEdit && (<button onClick={(e) => { e.preventDefault(); onEdit(); }} className="p-1 text-gray-400 hover:text-blue-500 transition" title="Ganti Nama">✏️</button>)}{onDelete && (<button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(e); }} className="p-1 text-gray-400 hover:text-red-500 transition" title="Hapus Project">❌</button>)}</div>)}</div>)}
-        </Link>
-    );
+            <Link 
+                href={href} 
+                title={!isSidebarOpen ? label : ''} 
+                className={`group flex items-center py-3 mb-1 font-medium rounded-xl transition-all duration-200 relative ${isSidebarOpen ? 'px-4 justify-between' : 'justify-center px-2'} ${active ? 'bg-purple-50 text-purple-700 font-bold dark:bg-purple-900/20 dark:text-purple-300' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'}`}
+            >
+                <div className={`flex items-center ${isSidebarOpen ? 'gap-3' : ''}`}>
+                    <span className={`${isSidebarOpen ? 'text-lg' : 'text-xl'}`}>{icon}</span>
+                    {/* 🔥 FIX: Ganti max-w-[100px] jadi w-full atau max-w-[140px] biar muat */}
+                    <span className={`transition-all duration-300 truncate ${isSidebarOpen ? 'opacity-100 block max-w-[140px]' : 'opacity-0 hidden w-0'}`}>
+                        {label}
+                    </span>
+                </div>
+                {isSidebarOpen && (
+                    <div className="flex items-center gap-1">
+                        {badge > 0 && (<span className={`text-[10px] py-0.5 px-2 rounded-full font-bold transition-opacity ${active ? 'bg-purple-200 text-purple-700 dark:bg-purple-800 dark:text-purple-200' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'} group-hover:hidden`}>{badge}</span>)}
+                        {(onEdit || onDelete) && (
+                            <div className="hidden group-hover:flex items-center bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-md">
+                                {onEdit && (<button onClick={(e) => { e.preventDefault(); onEdit(); }} className="p-1 text-gray-400 hover:text-blue-500 transition" title="Ganti Nama">✏️</button>)}
+                                {onDelete && (<button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(e); }} className="p-1 text-gray-400 hover:text-red-500 transition" title="Hapus Project">❌</button>)}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </Link>
+        );
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex transition-colors duration-300 ease-in-out">
@@ -91,13 +107,17 @@ export default function Authenticated({ user, header, children, categories = [],
                 <div className="p-3 space-y-1 flex-1 overflow-y-auto scrollbar-hide">
                     <div className={`text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-2 transition-all ${isSidebarOpen ? 'px-4 opacity-100' : 'text-center opacity-0 hidden'}`}>Menu</div>
                     
-                    {/* 🔥 FIX INBOX LINK: Paksa parameter filter=inbox biar gak kena redirect loop di Controller */}
                     <SidebarLink href={route('dashboard') + '?filter=inbox'} active={url.includes('filter=inbox') || (url === '/dashboard' && !url.includes('?'))} icon="📥" label="Inbox" />
                     
                     <SidebarLink href={route('dashboard') + '?filter=today'} active={url.includes('filter=today')} icon="☀️" label="Hari Ini" />
                     <SidebarLink href={route('dashboard') + '?filter=upcoming'} active={url.includes('filter=upcoming')} icon="🗓️" label="Mendatang" />
                     <SidebarLink href={route('dashboard') + '?filter=archive'} active={url.includes('filter=archive')} icon="📦" label="Arsip" />
-                    <SidebarLink href={route('activities.index')} active={url.includes('/activities')} icon="📜" label="Aktivitas" />
+                    
+                    {/* 🔥 UPDATE: MENAMBAHKAN MENU ANALYTICS DI SINI 🔥 */}
+                    <SidebarLink href={route('analytics.focus')} active={url.includes('/analytics/focus')} icon="🧠" label="Focus Analytics" />
+
+                    <SidebarLink href={route('activities.index')} active={url.includes('/activities') && !url.includes('/analytics')} icon="📜" label="Aktivitas" />
+                    
                     <div className="my-4 border-t border-gray-100 dark:border-gray-700"></div>
                     <div>
                         <div className={`flex items-center mb-2 transition-all ${isSidebarOpen ? 'justify-between px-4' : 'justify-center'}`}>
@@ -109,9 +129,6 @@ export default function Authenticated({ user, header, children, categories = [],
                 </div>
 
                 <div className="p-3 border-t border-gray-100 dark:border-gray-700 relative">
-                    
-                    {/* 🔥 TOMBOL TOGGLE THEME DIHAPUS TOTAL BIAR GAK BENTROK SAMA SETTINGS */}
-
                     {showUserMenu && (<><div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)}></div><div className={`absolute bottom-full mb-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50 transition-all duration-200 ease-out origin-bottom ${isSidebarOpen ? 'left-3 right-3' : 'left-full ml-2 w-48 bottom-0'}`}><div className="py-1"><Link href={route('profile.edit')} className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-gray-700" onClick={() => setShowUserMenu(false)}>Profile</Link><Link href={route('settings.edit')} className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-gray-700" onClick={() => setShowUserMenu(false)}>Pengaturan ⚙️</Link><Link href={route('logout')} method="post" as="button" className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => setShowUserMenu(false)}>Log Out</Link></div></div></>)}
                     
                     <button onClick={() => setShowUserMenu(!showUserMenu)} className={`flex items-center w-full p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}>
@@ -137,11 +154,10 @@ export default function Authenticated({ user, header, children, categories = [],
             
             <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
                 {header && (<header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors duration-300"><div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">{header}</div></header>)}
-                <main className="flex-1 pb-20"> {/* 🔥 Kasih padding bottom biar konten gak ketutup Timer */}
+                <main className="flex-1 pb-20"> 
                     {children}
                 </main>
             </div>
-            {/* 🔥 PASANG TIMER DI SINI (GLOBAL) */}
             <PomodoroTimer /> 
         </div>
     );

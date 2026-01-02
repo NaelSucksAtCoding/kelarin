@@ -26,15 +26,20 @@ class ActivityController extends Controller
     {
         $request->validate([
             'description' => 'required|string',
-            'type' => 'required|string', // success, info, dll
+            'type' => 'required|string',
+            // Tambahan validasi
+            'duration_minutes' => 'nullable|integer',
+            'task_id' => 'nullable|exists:tasks,id',
         ]);
 
-        Activity::create([
-            'user_id' => Auth::id(),
+        $request->user()->activities()->create([
             'description' => $request->description,
             'type' => $request->type,
+            // Simpan data bersih buat analytics
+            'duration_minutes' => $request->duration_minutes, 
+            'task_id' => $request->task_id
         ]);
 
-        return back(); // Gak perlu return apa-apa, 200 OK cukup
+        return back();
     }
 }
